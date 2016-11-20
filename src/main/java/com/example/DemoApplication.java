@@ -1,9 +1,14 @@
 package com.example;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.Map;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+
+import com.samskivert.mustache.Mustache;
+import com.samskivert.mustache.Template.Fragment;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -45,6 +50,20 @@ class LayoutAdvice {
 	public void defaults(Model model) {
 		model.addAttribute("title", "Demo Application");
 	}
+	@ModelAttribute("layout")
+	public Mustache.Lambda layout(Map<String,Object> model) {
+		return new Layout();
+	}
+}
+
+class Layout implements Mustache.Lambda {
+
+	String body;
+	@Override
+	public void execute(Fragment frag, Writer out) throws IOException {
+		body = frag.execute();
+	}
+	
 }
 
 @Controller
