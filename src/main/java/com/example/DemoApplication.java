@@ -8,8 +8,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import com.samskivert.mustache.Mustache;
+import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -46,24 +48,44 @@ public class DemoApplication extends WebSecurityConfigurerAdapter {
 
 @ControllerAdvice
 class LayoutAdvice {
-	@ModelAttribute
-	public void defaults(Model model) {
-		model.addAttribute("title", "Demo Application");
+	private final Mustache.Compiler compiler;
+
+	@Autowired
+	public LayoutAdvice(Compiler compiler) {
+		this.compiler = compiler;
 	}
+
+	@ModelAttribute("title")
+	public Mustache.Lambda defaults(@ModelAttribute Layout layout) {
+		return (frag, out) -> {
+			layout.title = frag.execute();
+		};
+	}
+
 	@ModelAttribute("layout")
-	public Mustache.Lambda layout(Map<String,Object> model) {
-		return new Layout();
+	public Mustache.Lambda layout(Map<String, Object> model) {
+		return new Layout(compiler);
 	}
 }
 
 class Layout implements Mustache.Lambda {
 
 	String body;
+
+	String title;
+
+	private Compiler compiler;
+
+	public Layout(Compiler compiler) {
+		this.compiler = compiler;
+	}
+
 	@Override
 	public void execute(Fragment frag, Writer out) throws IOException {
 		body = frag.execute();
+		compiler.compile("{{>layout}}").execute(frag.context(), out);
 	}
-	
+
 }
 
 @Controller
