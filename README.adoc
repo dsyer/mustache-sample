@@ -1,0 +1,756 @@
+I don't do much server-side templating, but when I do... well frankly,
+I tend to forget things. Every template language has its strengths and
+weaknesses, and they all have syntax to remember, and more frequently
+to forget. Recently I completed some work on the old
+https://github.com/spring-projects/spring-petclinic[Spring Petclinic],
+converting it to use http://www.thymeleaf.org/[Thymeleaf] in the view
+layer, and re-organizing the code to be a bit more "modern". I enjoyed
+working with Thymeleaf 3, and found it a pleasant experience, but had
+to spend a lot of time scanning documentation and samples. Then I had
+another little project that needed some templates, and I remembered my
+fondness for http://mustache.github.com[Mustache], which we added to
+Spring Boot back in version 1.2, and which plays an important role in
+the excellent tool
+https://github.com/spring-projects/spring-restdocs[Spring REST
+Docs]. I added `spring-boot-starter-mustache` to my new project, and
+was up and running within seconds.
+
+I want to show you what a neat little tool
+https://github.com/samskivert/jmustache[JMustache] is for server side
+rendering of HTML (or anything else in plain text come to that). I
+always liked http://mustache.github.com/[Mustache] because of its
+simplicity - it's "just enough" templating - and you really couldn't
+wish for a cleaner, leaner, more lightweight library than this one, if
+you have to render templates in the JVM. There is one jar file with no
+dependencies, and it adds 78kb to your classpath, which isn't going to
+hurt anyone, and will put a smile on many faces. It has very few
+features, which is excellent for people who can't remember syntax, and
+the manual is short, comprehensive, readable, and useful.
+
+If you carry on reading, as we build up a sample application, you will
+see how to build HTML pages with Mustache, rendering static and
+dynamic content, building forms and menus, and abstracting the layout
+of the pages into separate components. The simplicity of Mustache
+shines through, and guides you to put logic in Java, keeping the
+templates as clean as possible. As a sidebar you will see how to
+secure an application with a custom login form in a slightly unusual
+but interesting way.
+
+## Sample Code
+
+There is some sample code following the text in
+https://github.com/dsyer/mustache-sample[GitHub]. It is a tiny Spring
+MVC application, also using Spring Security. If you want to see it
+develop in stages along with the text, you can use some tags:
+
+- "base" is a starting point with a working application
+- "includes" creates a re-usable layout using a header and a footer
+- "layout" is a slightly more advanced implementation using a Mustache 
+  lambda
+- "menus" adds some more UI elements using more Spring Boot and 
+  Mustache features
+
+At every stage you can checkout the tag and run the app. There is a
+Maven wrapper in the root of the project, so you can build and run it
+from the command line, e.g.
+
+```
+$ git clone https://github.com/dsyer/mustache-sample
+$ cd mustache-sample
+$ git checkout base
+$ ./mvnw spring-boot:run
+```
+
+Instead of running from the command line you can import the project
+into your favourite IDE and run the main method in the
+`DemoApplication`.
+
+The app runs on http://localhost:8080, and you can authenticate with
+any username and password (even empty!). There are no real features in
+the sample app, but it does have login and logout and a home page, to
+provide some hooks to show the templating features.
+
+## Getting Started
+
+http://projects.spring.io/spring-boot/[Spring Boot] has
+autoconfiguration support for JMustache, so it is easy to get up and
+running with a Spring MVC application. You could generate a project
+from the https://start.spring.io[Spring Initializr], and ask it for
+`spring-boot-starter-mustache`.
+
+Spring Boot automatically configures a `ViewResolver` for JMustache,
+so you can implement a home page by providing a controller that
+returns a view name, e.g.
+
+.HomeController.java
+```java
+@Controller
+class HomeController {
+  @GetMapping("/")
+  String home() {
+    return "index";
+  }
+}
+```
+
+With this controller, when the user visits the home page ("/") Spring
+will render a template at `classpath:/templates/index.html`, which
+means in the directory `src/main/resources/templates` in your
+project. For example you could drop this in and confirm that it works:
+
+.index.html
+```html
+<!doctype html>
+<html lang="en">
+  <body>
+    <h1>Demo</h1>
+    <div>Hello World</div>
+  </body>
+</html>
+```
+
+### Make the Application Secure
+
+There's no dynamic (templated) content there yet. Let's make the app
+secure and add a login form, at which point you will need the dynamic
+content. So add `spring-cloud-starter-security` to your dependencies
+and the home page will be automatically protected. Suppose you
+want to have a login form at "/login", so you'll need the controller:
+
+.LoginController.java
+```java
+@Controller
+@RequestMapping("/login")
+class LoginController {
+
+	@GetMapping
+	public String form() {
+		return "login";
+	}
+
+}
+```
+
+You will also need some basic security configuration, which you can
+add as a method in the main application, if you extend a base class
+from Spring Security:
+
+.DemoApplication.java
+```java
+@SpringBootApplication
+public class DemoApplication extends WebSecurityConfigurerAdapter {
+
+  @Override
+  protected void configure(HttpSecurity http) throws Exception {
+    http.authorizeRequests()
+          .antMatchers("/login", "/error").permitAll()
+          .antMatchers("/**").authenticated()
+        .and().exceptionHandling()
+          .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+  }
+
+}
+```
+
+NOTE: this is a slightly unconventional configuration for form login,
+because it isn't using the built-in `formLogin()`, which would
+automatically add the authentication entry point. If that's
+distracting then skip the next section and just add `.formLogin()` to
+your configuration instead of the `exceptionHandling()` above
+(everything after the `.and()`)
+
+### Custom Authentication Processing with Spring MVC
+
+Spring Security implements form login (and everything else really)
+using a `Filter`, so that's what you would get with the built in
+`formLogin()` configuration. Just to make things interesting, you are
+going to do the authentication in a Spring MVC handler, enabling you
+to add some custom logic, and MVC is easier to work with than
+filters.
+
+So let's extend the `LoginController` with a method to handle
+username/password authentication (it is easy to extend to more
+complicated logic). The main thing it needs to do is validate the
+input and if it is a real user, populate the `SecurityContext`:
+
+.LoginController.java
+```java
+@PostMapping
+public void authenticate(@RequestParam Map<String, String> map) throws Exception {
+  Authentication result = new UsernamePasswordAuthenticationToken(
+      map.get("username"), "N/A",
+      AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
+  SecurityContextHolder.getContext().setAuthentication(result);
+}
+```
+
+NOTE: In this simple example there is only a "happy path" - all users are
+authenticated. Obviously this is not a very secure authentication
+process, and you would want to throw an `AuthenticationException`,
+e.g. `BadCredentialsException`, in a real controller. The exception
+would be handled by Spring Security.
+
+To mimic the behaviour of the built-in Spring Security login form, you
+also need to be able to redirect to a "saved request" that the user
+tried to access before login. Spring Security has an
+`AuthenticationSuccessHandler` abstraction for that, and a simple
+implementation that knows about the saved request. So the
+`authenticate` method can use that (it needs the servlet request and
+response, which you can add those as method parameters, and Spring MVC
+will inject them):
+
+.LoginController.java
+```java
+private AuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
+
+@PostMapping
+public void authenticate(@RequestParam Map<String, String> map,
+    HttpServletRequest request, HttpServletResponse response) throws Exception {
+  // ... authenticate user from request parameters
+  handler.onAuthenticationSuccess(request, response, result);
+}
+```
+
+### The Login Form
+
+Now you are ready to accept authentication requests, you need a form for
+users to fill in and submit. The `LoginController` renders the "login"
+template, so you need to add a "login.html" to your templates
+folder. For example:
+
+.login.html
+```html
+<!doctype html>
+<html lang="en">
+<body>
+  <h1>Login</h1>
+  <form action="/login" method="post">                            <1>
+    <label for="username">Username:</label>
+    <input type="text" name="username" />                         <2>
+    <label for="password">Password:</label>
+    <input type="password" name="password" />                     <3>
+    <input type="hidden" name="_csrf" value="{{_csrf.token}}" />  <4>
+    <button type="submit" class="btn btn-primary">Submit</button>
+  </form>
+</body>
+</html>
+```
+<1> a form, with a submit button to send the contents to "POST /login"
+<2> username field input
+<3> password field input
+<4> CSRF token, in the format required by Spring Security.
+
+The CSRF token is your first piece of dynamic content, and it shows
+you how Mustache works, and incidentally why it is called
+"Mustache". Variables from the "context" (in this case the Spring MVC
+model object) can be rendered using double braces, or "mustaches"
+(`{{` and `}}`). JMustache also navigates the object graph inside
+variables, so `_csrf.token` resolves as the "token" property of the
+"_csrf" object.
+
+Spring Security puts the "_csrf" object into request attributes. To
+get it copied to the MVC model you need a setting in your
+`application.properties`:
+
+.application.properties
+```properties
+spring.mustache.expose-request-attributes=true
+```
+
+With all that in place, you should find that on visiting the
+application in a browser will first redirect to "/login". Because of
+the weak (non-existent) authentication logic in your handler, you can
+put anything you like in the form and submit it to see the home page.
+
+NOTE: in the sample app we have some stylesheets imported via webjars
+to make the app look a little bit nicer, but they don't add anything
+to the functionality.
+
+The sample code has a "base" tag which is an application with all the
+features we have seen so far.
+
+## Layout Abstractions: Using Includes
+
+There are only 2 pages in our application, but even with such a small
+code base there is going to be a quite a bit of duplication in the
+HTML. It is useful to extract some common elements of all pages into
+re-usable templates. One way to do this is with "includes". So we
+could extract the top matter and bottom matter into "header.html":
+
+.header.html
+```html
+<!doctype html>
+<html lang="en">
+<body>
+```
+
+and "footer.html"
+
+.footer.html
+```html
+</body>
+</html>
+```
+
+(These are intentionally trivial examples. In a real app they would
+probably have a lot of stylesheets, scripts, and meta tags.)
+
+With those templates we can re-write the home page:
+
+.index.html
+```html
+{{>header}}
+    <h1>Demo</h1>
+    <div>Hello World</div>
+{{>footer}}
+```
+
+and the login form would look similar (just the body of the HTML). In
+these examples you can see the Mustache syntax for "includes", which
+is a bit like a variable, but with an extra ">" in the opening
+tag. The name of the template is resolved in the same way as the view
+templates (so "footer" is mapped to "footer.html" in the "templates"
+directory).
+
+### "Natural" Templates
+
+Some people like to use HTML templates that render on their own and
+can be viewed in a browser. It's kind of neat to be able to edit the
+templates and be able to see the result independent of any server or
+application logic. Mustache isn't a perfect language for such
+"natural" templates, but it does have one feature that you can use to
+get something approximating it. That feature is "comments".
+
+So, for example, you could add a static header and footer to your home
+page template, so that it renders in the browser (almost) as if it was
+in the application. Just surround the static content with Mustache
+comment tags (`{{!` and `}}`). For example:
+
+.index.html
+```html
+{{!
+<!doctype html>
+<html lang="en">
+<body>
+}}
+{{>header}}
+    <h1>Demo</h1>
+    <div>Hello World</div>
+{{>footer}}
+{{!
+</body>
+</html>
+}}
+```
+
+The browser will still render the Mustache tags as literal braces, but
+you can squint and ignore those, and the rest of the content will be
+layed out exactly as it would be in the application. Obviously, with
+such basic content there isn't a huge benefit, but when the content is
+more complex and has styling and scripts it might make more sense.
+
+The sample code has a tag in GitHub called "includes", which is an
+application with all the features we have seen so far.
+
+## Layout Abstractions: Using a Lambda
+
+Some people will be perfectly happy with a header and a footer in
+separate templates, but others will moan. To be honest it does feel a
+little awkward to be laying out hierarchical content (HTML), and be
+forced to break elements (like the `<body>` tag in the sample) across
+multiple files. It would be nicer if we could control the layout in a
+single file, something like this:
+
+.layout.html
+```html
+<!doctype html>
+<html lang="en">
+<body>
+  {{{layout.body}}}
+</body>
+</html>
+```
+
+and then somehow generate the "body" content in our home page and
+login page.
+
+Mustache allows you to insert generic "executable" content into your
+templates. This is a really powerful feature, and you can use it to
+extract the layout into its own template, as well as to do other
+things that involve a bit of logic. The syntax for that is a generic
+Mustache tag that resolves to something executable. The home
+page would look something like this:
+
+.index.html
+```html
+{{#layout}}
+    <h1>Demo</h1>
+    <div>Hello World</div>\  
+{{/layout}}
+```
+
+To make this work you first need an object called "layout" of type
+`Mustache.Lambda` in our MVC model. You could do this in your
+controller methods, or (better) use a `@ControllerAdvice` to add model
+attributes to all views. For example:
+
+.LayoutAdvice.java
+```java
+@ControllerAdvice
+class LayoutAdvice {
+
+  @ModelAttribute("layout")
+  public Mustache.Lambda layout() {
+    return new Layout();
+  }
+
+}
+
+class Layout {
+  String body;
+  @Override
+  public void execute(Fragment frag, Writer out) throws IOException {
+    body = frag.execute();
+  }
+}
+```
+
+Notice that the "layout" attribute renders its body using
+`Fragment.execute()` and assigns it to a property called "body", which
+can be referenced as a variable in Mustache. The "layout.html"
+template already contains the code to pull in the body,
+`{{{layout.body}}}`, so all that remains is to actually render the
+layout (so far we have only rendered the body). We can do this, in a
+first pass, by importing the layout explicitly into the home
+page:
+
+.index.html
+```html
+{{#layout}}
+    <h1>Demo</h1>
+    <div>Hello World</div>\  
+{{/layout}}
+{{>layout}}
+```
+
+Do the same with the login template:
+
+.login.html
+```html
+{{#layout}}
+  <h1>Login</h1>
+  <form action="/login" method="post">
+    <label for="username">Username:</label>
+    <input type="text" name="username" />
+    <label for="password">Password:</label>
+    <input type="password" name="password" />
+    <input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+    <button type="submit" class="btn btn-primary">Submit</button>
+  </form>
+{{/layout}}
+{{>layout}}
+```
+
+and you are good to go. Everything works, and the app shows the login page and home page with the same layout.
+
+TIP: you might have noticed the triple mustaches (`{{{` and `}}}`) in
+the "layout.html". This is a JMustache feature: all content is escaped
+by default, but this content is going to be rendered twice, so we only
+need it escaped the first time, so we use triple mustaches.
+
+### Rendering the Layout in the Lambda
+
+To remove the need for the explicit `{{>layout}}` include in every
+page that uses `{{#layout}}`, you can do that part inside the
+lambda. You'll need a reference to the Mustache compiler, and then you
+just need to compile a template which includes the layout and execute
+it:
+
+.Layout.java
+```java
+class Layout implements Mustache.Lambda {
+
+  String body;
+
+  private Compiler compiler;
+
+  public Layout(Compiler compiler) {
+    this.compiler = compiler;
+  }
+
+  @Override
+  public void execute(Fragment frag, Writer out) throws IOException {
+    body = frag.execute();
+    compiler.compile("{{>layout}}").execute(frag.context(), out);
+  }
+
+}
+```
+
+The compiler is wired into the `Layout` in its constructor, and it can
+be injected into the controller advice using `@Autowired`:
+
+.LayoutAdvice.java
+```java
+@ControllerAdvice
+class LayoutAdvice {
+	private final Mustache.Compiler compiler;
+
+	@Autowired
+	public LayoutAdvice(Compiler compiler) {
+		this.compiler = compiler;
+	}
+
+	@ModelAttribute("layout")
+	public Mustache.Lambda layout(Map<String, Object> model) {
+		return new Layout(compiler);
+	}
+}
+```
+
+That's it. You can remove the include from the view
+templates. E.g. this works for the home page:
+
+.index.html
+```html
+{{#layout}}
+    <h1>Demo</h1>
+    <div>Hello World</div>\  
+{{/layout}}
+```
+
+The last line of the old version of the template has effectively been
+moved into the `Layout` lambda.
+
+### More Dynamic Content
+
+It's quite common for layout templates like the one that we are
+developing to have content that varies between uses. For instance you
+might want the "title" on the home page to be different to that on the
+login page, but it is part of the HTML header, not the body, so
+logically it is part of the layout. Let's make that explicit, by
+adding the title to the header of the layout:
+
+.layout.html
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{{{layout.title}}}</title>
+</head>
+<body>
+  {{{layout.body}}}
+</body>
+</html>
+```
+
+This is a strong hint about how you can implement this feature: the
+layout has a new property called "title", and you can give it a
+default value in the class declaration:
+
+.Layout.java
+```java
+class Layout implements Mustache.Lambda {
+
+  String body;
+
+  String title = "Demo Application";
+
+  ...
+
+}
+```
+
+Now, all that remains is to populate that property. Logically, setting
+the title is part of the page view, not the layout, so you'd like to
+set it in the same place you declare the rest of the page
+content. Other template languages have "parameterised fragments", but
+Mustache is too minimalistic for that. The minimalism is a feature,
+and actually it leads to quite an elegant solution to this
+problem.
+
+All you have is tags, so you might want to do something like this:
+
+.index.html
+```html
+{{#layout}}{{#title}}Home Page{{/title}}
+    <h1>Demo</h1>
+    <div>Hello World</div>\  
+{{/layout}}
+```
+
+That looks like it might work. All you need to do is provide a lambda
+to capture the title. In the layout advice you can do this:
+
+.LayoutAdvice.java
+```java
+@ControllerAdvice
+class LayoutAdvice {
+
+  ...
+
+  @ModelAttribute("title")
+  public Mustache.Lambda defaults(@ModelAttribute Layout layout) {
+    return (frag, out) -> {
+      layout.title = frag.execute();
+    };
+  }
+
+}
+```
+
+and as long as the call to `{{#title}}` is nested inside the call to
+`{{#layout}}` everything will work out just fine. You cleaned up your
+templates and moved a tiny piece of logic to Java, where it belongs.
+
+The sample code is tagged with "layout" at this point, if you want to
+check it out and compare notes.
+
+## Logout: Menus and Spring Boot Configuration
+
+You can load a home page and log into your application using a
+form. The user can't yet log out, so you probably want to add that
+feature, ideally as a link on all pages, so that makes it part of the
+layout. To show how that works, let's add a generic, declarative menu
+bar to the application, and make one part of it a logout button.
+
+The logout link is actually pretty easy. We only need a form with the
+CSRF token and a link to submit it, e.g:
+
+.layout.html
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{{{layout.title}}}</title>
+</head>
+<body>
+  <form id="logout" action="/logout" method="post">
+    <input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+    <button type="submit" class="btn btn-primary">Logout</button>
+  </form>
+  {{{layout.body}}}
+</body>
+</html>
+```
+
+That already should work. But lets incorporate the logout into a more
+generic set of menu links. A list of elements in HTML can be
+represented as a `<ul/>` with nested `<li/>`, so the menus for your
+application can be rendered that way. In Mustache you do iteration
+just like lambdas, using a tag, so let's invent a new one called
+`{{#menus}}`:
+
+.layout.html
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <title>{{{layout.title}}}</title>
+</head>
+<body>
+  <ul class="nav nav-pills" role="tablist">
+    {{#menus}}<li><a href="{{path}}">{{name}}</a></li>{{/menus}}
+    <li><a href="#" onclick="document.getElementById('#logout').submit()">Logout</a></li>
+  </ul>
+  {{{layout.body}}}
+  <form id="logout" action="/logout" method="post">
+    <input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+  </form>
+</body>
+</html>
+```
+
+Notice that inside the `{{#menus}}` tag we pull out variables, "name"
+and "path" using the normal Mustache syntax.
+
+Now you have to define the tag in your controller advice (or
+equivalently in the controllers), so that "menus" resolves to an
+iterable:
+
+.LayoutAdvice.java
+```java
+@ModelAttribute("menus")
+public Iterable<Menu> menus() {
+  return application.getMenus();
+}
+```
+
+So this new code introduced a `Menu` type that contains the static
+content for each menu in the UI. The layout calls for "name" and
+"path", so you need those properties:
+
+.Menu.java
+```java
+class Menu {
+  private String name;
+  private String path;
+  // ... getters and setters
+}
+```
+
+In the layout advice above the menus came from an `application`
+object. That wasn't strictly necessary: you could have declared the
+list of menus inline in the `menus()` method, but extracting it into
+another object gives us the chance to use a nice Spring Boot feature,
+where we can declare the menus in a config file in a compact format.
+
+So now you need to create the `Application` object to hold the menus,
+and inject it into the layout advice:
+
+.Layout.java
+```java
+private Application application;
+
+@Autowired
+public LayoutAdvice(Compiler compiler, Application application) {
+  this.compiler = compiler;
+  this.application = application;
+}
+```
+
+where in `Application` you have something like this
+
+.Application.java
+```html
+@Component
+@ConfigurationProperties("app")
+class Application {
+  private List<Menu> menus = new ArrayList<>();
+  // .. getters and setters
+}
+```
+
+The `@ConfigurationProperties` tells Spring Boot to bind to this bean
+from the environment. Switching from `application.properties` to
+`application.yml` you could create a "Home" and a "Login" menu like
+this:
+
+.application.yml
+```yaml
+app.menus:
+  - name: Home
+    path: /
+  - name: Login
+    path: /login
+```
+
+With this in place, the "layout.html" that you already defined now has
+all it needs to work.
+
+The sample code is tagged with "menus" at this point in github, if you
+want to check it out and compare notes. It's also the final state, so
+it's the same code in master, possibly with bug fixes and updates to
+libraries. I hope you enjoy using Mustache as much as I do.
+
+## Footnote
+
+The sample has one or two extra features on top of the code in the
+text. One of which is that the "active" menu is rendered differently
+to the others using a CSS style. For that to work, you need to add a
+flag to the `Menu` and reset it in the layout advice. The logic is
+natural and easy to add to the advice. Another is that the title for
+the page is part of the menu definition instead of being a separate
+lambda.
+
+
