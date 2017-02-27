@@ -406,7 +406,7 @@ class LayoutAdvice {
 
 }
 
-class Layout {
+class Layout implements Mustache.Lambda {
   String body;
   @Override
   public void execute(Fragment frag, Writer out) throws IOException {
