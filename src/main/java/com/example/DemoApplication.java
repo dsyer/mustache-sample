@@ -40,14 +40,15 @@ public class DemoApplication extends WebSecurityConfigurerAdapter {
 
 	@Override
 	protected void configure(HttpSecurity http) throws Exception {
-		http.authorizeRequests().antMatchers("/login", "/error").permitAll()
-				.antMatchers("/**").authenticated().and().exceptionHandling()
+		http.authorizeRequests().antMatchers("/login", "/error", "/webjars/**").permitAll().antMatchers("/**")
+				.authenticated().and().exceptionHandling()
 				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
 	}
 
 	public static void main(String[] args) {
 		SpringApplication.run(DemoApplication.class, args);
 	}
+
 }
 
 @Component
@@ -61,9 +62,13 @@ class Application {
 	}
 
 	public static class Menu {
+
 		private String name;
+
 		private String path;
+
 		private String title;
+
 		private boolean active;
 
 		public String getName() {
@@ -97,16 +102,18 @@ class Application {
 		public void setActive(boolean active) {
 			this.active = active;
 		}
+
 	}
 
 	public Menu getMenu(String name) {
 		for (Menu menu : menus) {
 			if (menu.getName().equalsIgnoreCase(name)) {
-				return menu;				
+				return menu;
 			}
 		}
 		return menus.get(0);
 	}
+
 }
 
 @ControllerAdvice
@@ -143,6 +150,7 @@ class LayoutAdvice {
 	public Mustache.Lambda layout(Map<String, Object> model) {
 		return new Layout(compiler);
 	}
+
 }
 
 class Layout implements Mustache.Lambda {
@@ -168,10 +176,12 @@ class Layout implements Mustache.Lambda {
 @Controller
 @RequestMapping("/")
 class HomeController {
+
 	@GetMapping
 	public String home() {
 		return "index";
 	}
+
 }
 
 @Controller
@@ -186,12 +196,12 @@ class LoginController {
 	}
 
 	@PostMapping
-	public void authenticate(@RequestParam Map<String, String> map,
-			HttpServletRequest request, HttpServletResponse response) throws Exception {
-		Authentication result = new UsernamePasswordAuthenticationToken(
-				map.get("username"), "N/A",
+	public void authenticate(@RequestParam Map<String, String> map, HttpServletRequest request,
+			HttpServletResponse response) throws Exception {
+		Authentication result = new UsernamePasswordAuthenticationToken(map.get("username"), "N/A",
 				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(result);
 		handler.onAuthenticationSuccess(request, response, result);
 	}
+
 }
