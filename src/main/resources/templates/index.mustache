@@ -14,6 +14,22 @@
 <body>}}
 {{#layout}}{{#menu}}home{{/menu}}
 	<h1>Demo</h1>
-	<div class="container">Hello World</div>
+	<div class="container">
+		<div class="col-sm-offset-2 col-sm-10">Hello World</div>
+		{{#form.foo}}<form method="post">
+			<div class="form-group has-feedback">
+				{{#inputField}}Value <input name="value"/>{{/inputField}}
+				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+			</div>
+			<div class="form-group">
+				<div class="col-sm-offset-2 col-sm-10">
+					<button class="btn btn-default" type="submit">Submit</button>
+				</div>
+			</div>
+		</form>{{/form.foo}}
+	</div>
+	{{#value}}<div class="container">
+		<div class="col-sm-offset-2 col-sm-10">Value is: {{.}}</div>
+	</div>{{/value}}
 {{/layout}}
 {{!</body></html>}}

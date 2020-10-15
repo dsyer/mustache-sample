@@ -3,8 +3,13 @@ package com.example;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -28,6 +33,7 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -119,6 +125,10 @@ class Application {
 @ControllerAdvice
 class LayoutAdvice {
 
+	private static Pattern NAME = Pattern.compile(".*name=\\\"([a-zA-Z0-9]*)\\\".*");
+
+	private static Pattern TYPE = Pattern.compile(".*type=\\\"([a-zA-Z0-9]*)\\\".*");
+
 	private final Mustache.Compiler compiler;
 
 	private Application application;
@@ -146,9 +156,105 @@ class LayoutAdvice {
 		};
 	}
 
+	@ModelAttribute("inputField")
+	public Mustache.Lambda inputField(Map<String, Object> model) {
+		return (frag, out) -> {
+			String body = frag.execute();
+			String label = body.substring(0, body.indexOf("<") - 1).trim();
+			Form form = (Form) frag.context();
+			String target = form.getName();
+			String name = match(NAME, body, "unknown");
+			String type = match(TYPE, body, "text");
+			BindingResult status = (BindingResult) model.get("org.springframework.validation.BindingResult." + target);
+			InputField field = new InputField(label, name, type, status);
+			compiler.compile("{{>inputField}}").execute(field, out);
+		};
+	}
+
+	private String match(Pattern pattern, String body, String fallback) {
+		Matcher matcher = pattern.matcher(body);
+		return matcher.matches() ? matcher.group(1) : fallback;
+	}
+
+	@ModelAttribute("form")
+	public Map<String, Form> form(Map<String, Object> model) {
+		return new LinkedHashMap<String, Form>() {
+			@Override
+			public boolean containsKey(Object key) {
+				if (!super.containsKey(key)) {
+					put((String) key, new Form((String) key, model.get(key)));
+				}
+				return super.containsKey(key);
+			}
+
+			@Override
+			public Form get(Object key) {
+				if (!super.containsKey(key)) {
+					put((String) key, new Form((String) key, model.get(key)));
+				}
+				return super.get(key);
+			}
+
+		};
+	}
+
 	@ModelAttribute("layout")
 	public Mustache.Lambda layout(Map<String, Object> model) {
 		return new Layout(compiler);
+	}
+
+}
+
+class InputField {
+
+	String label;
+
+	String name;
+
+	boolean date;
+
+	boolean valid;
+
+	String value;
+
+	List<String> errors = Collections.emptyList();
+
+	public InputField(String label, String name, String type, BindingResult status) {
+		this.label = label;
+		this.name = name;
+		if (status != null) {
+			valid = !status.hasFieldErrors(name);
+			errors = status.getFieldErrors(name).stream().map(error -> error.getDefaultMessage())
+					.collect(Collectors.toList());
+			value = status.getFieldValue(name) == null ? "" : status.getFieldValue(name).toString();
+		}
+		this.date = "date".equals(type);
+	}
+
+}
+
+class Form implements Mustache.Lambda {
+
+	private Object target;
+
+	private String name;
+
+	public Form(String name, Object target) {
+		this.name = name;
+		this.target = target;
+	}
+
+	@Override
+	public void execute(Fragment frag, Writer out) throws IOException {
+		frag.execute(this, out);
+	}
+
+	public Object getTarget() {
+		return target;
+	}
+
+	public String getName() {
+		return name;
 	}
 
 }
@@ -173,12 +279,44 @@ class Layout implements Mustache.Lambda {
 
 }
 
+class Foo {
+
+	private String value = "";
+
+	public Foo() {
+	}
+
+	public Foo(String value) {
+		this.value = value;
+	}
+
+	public String getValue() {
+		return this.value;
+	}
+
+	public void setValue(String value) {
+		this.value = value;
+	}
+
+	@Override
+	public String toString() {
+		return "Foo [value=" + this.value + "]";
+	}
+
+}
+
 @Controller
 @RequestMapping("/")
 class HomeController {
 
 	@GetMapping
-	public String home() {
+	public String home(@ModelAttribute Foo foo) {
+		return "index";
+	}
+
+	@PostMapping
+	public String post(@ModelAttribute Foo foo, Map<String, Object> model) {
+		model.put("value", foo.getValue());
 		return "index";
 	}
 

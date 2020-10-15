@@ -1,0 +1,32 @@
+{{!
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>Faux</title>
+<meta name="description" content="" />
+<meta name="viewport" content="width=device-width" />
+<base href="/" />
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"></link>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" ></script>
+</head>
+<body>
+<form>}}
+  <div class="form-group{{^valid}} has-error{{/valid}}">
+    <label class="col-sm-2 control-label">{{label}}</label>
+    <div class="col-sm-10">
+        {{^date}}<input class="form-control" type="text" name="{{name}}" value="{{value}}"/>{{/date}}
+        {{#date}}<input class="form-control" type="text" name="{{name}}"
+                    placeholder="YYYY-MM-DD" title="Enter a date in this format: YYYY-MM-DD"
+                    pattern="(?:19|20)[0-9]{2}-(?:(?:0[1-9]|1[0-2])-(?:0[1-9]|1[0-9]|2[0-9])|(?:(?!02)(?:0[1-9]|1[0-2])-(?:30))|(?:(?:0[13578]|1[02])-31))" value="{{value}}"/>{{/date}}
+      {{#valid}}<span
+        class="glyphicon glyphicon-ok form-control-feedback"
+        aria-hidden="true"></span>{{/valid}}
+      {{^valid}}<span
+          class="glyphicon glyphicon-remove form-control-feedback"
+          aria-hidden="true"></span>
+        {{#errors}}<span class="help-inline">{{.}}</span>{{/errors}}{{/valid}}
+    </div>
+  </div>
+{{!</form></body></html>}}
