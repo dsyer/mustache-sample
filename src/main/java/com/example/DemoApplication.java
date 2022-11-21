@@ -14,21 +14,17 @@ import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import com.example.Application.Menu;
-import com.samskivert.mustache.Mustache;
-import com.samskivert.mustache.Mustache.Compiler;
-import com.samskivert.mustache.Template.Fragment;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -41,14 +37,24 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-@SpringBootApplication
-public class DemoApplication extends WebSecurityConfigurerAdapter {
+import com.example.Application.Menu;
+import com.samskivert.mustache.Mustache;
+import com.samskivert.mustache.Mustache.Compiler;
+import com.samskivert.mustache.Template.Fragment;
 
-	@Override
-	protected void configure(HttpSecurity http) throws Exception {
-		http.authorizeRequests().antMatchers("/login", "/error", "/webjars/**").permitAll().antMatchers("/**")
-				.authenticated().and().exceptionHandling()
+/**
+ * @author Dave Syer
+ *
+ */
+@SpringBootApplication
+public class DemoApplication {
+
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http.authorizeRequests().antMatchers("/login", "/error", "/webjars/**")
+				.permitAll().antMatchers("/**").authenticated().and().exceptionHandling()
 				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+		return http.build();
 	}
 
 	public static void main(String[] args) {
@@ -165,7 +171,8 @@ class LayoutAdvice {
 			String target = form.getName();
 			String name = match(NAME, body, "unknown");
 			String type = match(TYPE, body, "text");
-			BindingResult status = (BindingResult) model.get("org.springframework.validation.BindingResult." + target);
+			BindingResult status = (BindingResult) model
+					.get("org.springframework.validation.BindingResult." + target);
 			InputField field = new InputField(label, name, type, status);
 			compiler.compile("{{>inputField}}").execute(field, out);
 		};
@@ -224,9 +231,10 @@ class InputField {
 		this.name = name;
 		if (status != null) {
 			valid = !status.hasFieldErrors(name);
-			errors = status.getFieldErrors(name).stream().map(error -> error.getDefaultMessage())
-					.collect(Collectors.toList());
-			value = status.getFieldValue(name) == null ? "" : status.getFieldValue(name).toString();
+			errors = status.getFieldErrors(name).stream()
+					.map(error -> error.getDefaultMessage()).collect(Collectors.toList());
+			value = status.getFieldValue(name) == null ? ""
+					: status.getFieldValue(name).toString();
 		}
 		this.date = "date".equals(type);
 	}
@@ -334,9 +342,10 @@ class LoginController {
 	}
 
 	@PostMapping
-	public void authenticate(@RequestParam Map<String, String> map, HttpServletRequest request,
-			HttpServletResponse response) throws Exception {
-		Authentication result = new UsernamePasswordAuthenticationToken(map.get("username"), "N/A",
+	public void authenticate(@RequestParam Map<String, String> map,
+			HttpServletRequest request, HttpServletResponse response) throws Exception {
+		Authentication result = new UsernamePasswordAuthenticationToken(
+				map.get("username"), "N/A",
 				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(result);
 		handler.onAuthenticationSuccess(request, response, result);
