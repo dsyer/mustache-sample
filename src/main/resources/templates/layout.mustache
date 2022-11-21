@@ -9,20 +9,23 @@
 <base href="/" />
 <link rel="stylesheet" type="text/css"
 	href="/webjars/bootstrap/dist/css/bootstrap.min.css" />
+<link rel="stylesheet" href="/webjars/font-awesome/css/font-awesome.min.css">
 <script type="text/javascript" src="/webjars/jquery/dist/jquery.min.js"></script>
 <script type="text/javascript"
 	src="/webjars/bootstrap/dist/js/bootstrap.min.js"></script>
 </head>
 <body>
-	<div class="container">
-		<ul class="nav nav-pills" role="tablist">
-			{{#menus}}<li class="{{#active}}active{{/active}}"><a href="{{path}}">{{name}}</a></li>{{/menus}}
-			<li><a href="#" onclick="$('#logout').submit()">Logout</a></li>
-		</ul>
+	<ul class="nav nav-tabs">
+		{{#menus}}<li class="nav-item{{#active}} active{{/active}}"><a class="nav-link" href="{{path}}">{{name}}</a></li>{{/menus}}
+		<li class="nav-item"><a class="nav-link" href="#" onclick="$('#logout').submit()">Logout</a></li>
+	</ul>
+	<div class="container-fluid">
+		<div class="container xd-container">
+			{{{layout.body}}}
+			<form id="logout" action="/logout" method="post">
+				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+			</form>
+		</div>
 	</div>
-	{{{layout.body}}}
-	<form id="logout" action="/logout" method="post">
-		<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
-	</form>
 </body>
 </html>
