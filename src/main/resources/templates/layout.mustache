@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title>{{{layout.title}}}</title>
+<title>{{$title}}Title{{/title}}</title>
 <meta name="description" content="" />
 <meta name="viewport" content="width=device-width" />
 <base href="/" />
@@ -21,11 +21,11 @@
 	</ul>
 	<div class="container-fluid">
 		<div class="container xd-container">
-			{{{layout.body}}}
-			<form id="logout" action="/logout" method="post">
-				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
-			</form>
+			{{$body}}Empty body{{/body}}
 		</div>
 	</div>
+	<form id="logout" action="/logout" method="post">
+		<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+	</form>
 </body>
 </html>

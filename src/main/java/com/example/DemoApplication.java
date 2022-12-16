@@ -1,20 +1,14 @@
 package com.example;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -27,26 +21,32 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.example.Application.Menu;
-import com.samskivert.mustache.Mustache;
-import com.samskivert.mustache.Mustache.Compiler;
-import com.samskivert.mustache.Template.Fragment;
+
+import io.jstach.jstache.JStache;
+import io.jstach.jstache.JStacheFlags;
+import io.jstach.jstache.JStacheFlags.Flag;
+import io.jstach.jstache.JStachePartial;
+import io.jstach.jstache.JStachePartials;
+import io.jstach.jstachio.JStachio;
 
 /**
  * @author Dave Syer
  *
  */
 @SpringBootApplication
+@JStacheFlags(flags = Flag.DEBUG)
 public class DemoApplication {
 
 	@Bean
@@ -81,7 +81,7 @@ class Application {
 
 		private String title;
 
-		private boolean active;
+		public boolean active;
 
 		public String getName() {
 			return name;
@@ -128,107 +128,24 @@ class Application {
 
 }
 
-@ControllerAdvice
-class LayoutAdvice {
-
-	private static Pattern NAME = Pattern.compile(".*name=\\\"([a-zA-Z0-9]*)\\\".*");
-
-	private static Pattern TYPE = Pattern.compile(".*type=\\\"([a-zA-Z0-9]*)\\\".*");
-
-	private final Mustache.Compiler compiler;
-
-	private Application application;
-
-	@Autowired
-	public LayoutAdvice(Compiler compiler, Application application) {
-		this.compiler = compiler;
-		this.application = application;
-	}
-
-	@ModelAttribute("menus")
-	public Iterable<Menu> menus(@ModelAttribute Layout layout) {
-		for (Menu menu : application.getMenus()) {
-			menu.setActive(false);
-		}
-		return application.getMenus();
-	}
-
-	@ModelAttribute("menu")
-	public Mustache.Lambda menu(@ModelAttribute Layout layout) {
-		return (frag, out) -> {
-			Menu menu = application.getMenu(frag.execute());
-			menu.setActive(true);
-			layout.title = menu.getTitle();
-		};
-	}
-
-	@ModelAttribute("inputField")
-	public Mustache.Lambda inputField(Map<String, Object> model) {
-		return (frag, out) -> {
-			String body = frag.execute();
-			String label = body.substring(0, body.indexOf("<") - 1).trim();
-			Form form = (Form) frag.context();
-			String target = form.getName();
-			String name = match(NAME, body, "unknown");
-			String type = match(TYPE, body, "text");
-			BindingResult status = (BindingResult) model
-					.get("org.springframework.validation.BindingResult." + target);
-			InputField field = new InputField(label, name, type, status);
-			compiler.compile("{{>inputField}}").execute(field, out);
-		};
-	}
-
-	private String match(Pattern pattern, String body, String fallback) {
-		Matcher matcher = pattern.matcher(body);
-		return matcher.matches() ? matcher.group(1) : fallback;
-	}
-
-	@ModelAttribute("form")
-	public Map<String, Form> form(Map<String, Object> model) {
-		return new LinkedHashMap<String, Form>() {
-			@Override
-			public boolean containsKey(Object key) {
-				if (!super.containsKey(key)) {
-					put((String) key, new Form((String) key, model.get(key)));
-				}
-				return super.containsKey(key);
-			}
-
-			@Override
-			public Form get(Object key) {
-				if (!super.containsKey(key)) {
-					put((String) key, new Form((String) key, model.get(key)));
-				}
-				return super.get(key);
-			}
-
-		};
-	}
-
-	@ModelAttribute("layout")
-	public Mustache.Lambda layout(Map<String, Object> model) {
-		return new Layout(compiler);
-	}
-
-}
-
 class InputField {
 
-	String label;
+	public String label;
 
-	String name;
+	public String name;
 
-	boolean date;
+	public boolean date;
 
-	boolean valid;
+	public boolean valid = true;
 
-	String value;
+	public String value;
 
-	List<String> errors = Collections.emptyList();
+	public List<String> errors = Collections.emptyList();
 
-	public InputField(String label, String name, String type, BindingResult status) {
+	public InputField(String label, String name, String value, String type, BindingResult status) {
 		this.label = label;
 		this.name = name;
+		this.value = value == null ? "" : value;
 		if (status != null) {
 			valid = !status.hasFieldErrors(name);
 			errors = status.getFieldErrors(name).stream()
@@ -241,50 +158,38 @@ class InputField {
 
 }
 
-class Form implements Mustache.Lambda {
+record Form(String name, Object target, CsrfToken _csrf) {
+}
 
-	private Object target;
+@JStache(path = "templates/index.mustache")
+@JStachePartials({ @JStachePartial(name = "layout", path = "templates/layout.mustache"),
+		@JStachePartial(name = "inputField", path = "templates/inputField.mustache") })
+record IndexPage(Application application, Foo foo, BindingResult status, CsrfToken _csrf) {
 
-	private String name;
-
-	public Form(String name, Object target) {
-		this.name = name;
-		this.target = target;
+	public IndexPage(Application application, BindingResult status, CsrfToken _csrf) {
+		this(application, new Foo(), status, _csrf);
 	}
 
-	@Override
-	public void execute(Fragment frag, Writer out) throws IOException {
-		frag.execute(this, out);
+	public Form form() {
+		return new Form("foo", foo, _csrf);
 	}
 
-	public Object getTarget() {
-		return target;
+	public InputField field() {
+		return new InputField("Value", "value", foo.getValue(), "text", status);
 	}
 
-	public String getName() {
-		return name;
+	public List<Menu> getMenus() {
+		return application.getMenus();
 	}
 
 }
 
-class Layout implements Mustache.Lambda {
-
-	String title = "Demo Application";
-
-	String body;
-
-	private Compiler compiler;
-
-	public Layout(Compiler compiler) {
-		this.compiler = compiler;
+@JStache(path = "templates/login.mustache")
+@JStachePartials(@JStachePartial(name = "layout", path = "templates/layout.mustache"))
+record LoginPage(Application application, CsrfToken _csrf) {
+	public List<Menu> getMenus() {
+		return application.getMenus();
 	}
-
-	@Override
-	public void execute(Fragment frag, Writer out) throws IOException {
-		body = frag.execute();
-		compiler.compile("{{>layout}}").execute(frag.context(), out);
-	}
-
 }
 
 class Foo {
@@ -313,32 +218,43 @@ class Foo {
 
 }
 
-@Controller
+@RestController
 @RequestMapping("/")
 class HomeController {
 
+	private final Application application;
+
+	public HomeController(Application application) {
+		this.application = application;
+	}
+
 	@GetMapping
-	public String home(@ModelAttribute Foo foo) {
-		return "index";
+	public String home(@ModelAttribute Foo target, @RequestAttribute("_csrf") CsrfToken _csrf) {
+		return JStachio.render(new IndexPage(application, target, null, _csrf));
 	}
 
 	@PostMapping
-	public String post(@ModelAttribute Foo foo, Map<String, Object> model) {
-		model.put("value", foo.getValue());
-		return "index";
+	public String post(@ModelAttribute Foo foo, @RequestAttribute("_csrf") CsrfToken _csrf, BindingResult status) {
+		return JStachio.render(new IndexPage(application, foo, status, _csrf));
 	}
 
 }
 
-@Controller
+@RestController
 @RequestMapping("/login")
 class LoginController {
 
 	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
 
+	private final Application application;
+
+	public LoginController(Application application) {
+		this.application = application;
+	}
+
 	@GetMapping
-	public String form() {
-		return "login";
+	public String form(@RequestAttribute("_csrf") CsrfToken _csrf) {
+		return JStachio.render(new LoginPage(application, _csrf));
 	}
 
 	@PostMapping

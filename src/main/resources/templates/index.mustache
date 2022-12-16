@@ -1,24 +1,24 @@
-{{!
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title>Faux</title>
-<meta name="description" content="" />
-<meta name="viewport" content="width=device-width" />
-<base href="/" />
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"></link>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" ></script>
-</head>
-<body>}}
-{{#layout}}{{#menu}}home{{/menu}}
+{{<layout}}{{$menu}}home{{/menu}}{{$body}}
 	<h1>Demo</h1>
 	<div class="container">
 		<div class="col-sm-offset-2 col-sm-10">Hello World</div>
-		{{#form.foo}}<form method="post">
+		{{#form}}<form method="post">
 			<div class="form-group has-feedback">
-				{{#inputField}}Value <input name="value"/>{{/inputField}}
+				{{#field}}
+				<div class="form-group{{^valid}} has-error{{/valid}}">
+					<label class="col-sm-2 control-label">{{label}}</label>
+					<div class="col-sm-4">
+						<input class="form-control" type="text" name="{{name}}" value="{{value}}"/>
+						{{#valid}}<span
+							class="fa fa-check valid-feedback"
+							aria-hidden="true"></span>{{/valid}}
+						{{^valid}}<span
+							class="fa fa-remove invalid-feedback"
+							aria-hidden="true"></span>
+							{{#errors}}<span class="help-inline">{{.}}</span>{{/errors}}{{/valid}}
+					</div>
+				</div>
+				{{/field}}
 				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
 			</div>
 			<div class="form-group">
@@ -26,10 +26,9 @@
 					<button class="btn btn-primary" type="submit">Submit</button>
 				</div>
 			</div>
-		</form>{{/form.foo}}
+		</form>{{/form}}
 	</div>
-	{{#value}}<div class="container">
+	{{#foo.value}}<div class="container">
 		<div class="col-sm-offset-2 col-sm-10">Value is: {{.}}</div>
-	</div>{{/value}}
-{{/layout}}
-{{!</body></html>}}
+	</div>{{/foo.value}}
+{{/body}}{{/layout}}
