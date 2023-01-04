@@ -5,9 +5,6 @@ app.menus:
   - title: Login
     name: Login
     path: /login
-spring:
-  mustache:
-    expose-request-attributes: true
 logging:
   level:
     org.springframework.security: DEBUG

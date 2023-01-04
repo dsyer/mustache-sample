@@ -7,9 +7,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -22,6 +21,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
@@ -43,6 +46,8 @@ import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
 import io.jstach.jstache.JStacheFlags.Flag;
 import io.jstach.jstachio.JStachio;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author Dave Syer
@@ -53,11 +58,17 @@ import io.jstach.jstachio.JStachio;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http.authorizeHttpRequests().antMatchers("/login", "/error", "/webjars/**")
-				.permitAll().antMatchers("/**").authenticated().and().exceptionHandling()
+	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository)
+			throws Exception {
+		http.authorizeHttpRequests().requestMatchers("/login", "/error", "/webjars/**")
+				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling()
 				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
 		return http.build();
+	}
+	@Bean
+	public HttpSessionSecurityContextRepository sessionRepository() {
+		return new HttpSessionSecurityContextRepository();
 	}
 
 	public static void main(String[] args) {
@@ -69,6 +80,17 @@ public class DemoApplication {
 @Component
 @ConfigurationProperties("app")
 class Application {
+
+	private static Log logger = LogFactory.getLog(Application.class);
+
+	private static Menu DEFAULT_MENU;
+
+	static {
+		DEFAULT_MENU = new Menu();
+		DEFAULT_MENU.setName("Home");
+		DEFAULT_MENU.setPath("/");
+		DEFAULT_MENU.setActive(true);
+	}
 
 	private List<Menu> menus = new ArrayList<>();
 
@@ -126,7 +148,8 @@ class Application {
 				return menu;
 			}
 		}
-		return menus.get(0);
+		logger.error("No menu found for " + name + " (" + menus + ")");
+		return DEFAULT_MENU;
 	}
 
 }
@@ -212,7 +235,7 @@ class BasePage {
 
 	public List<Menu> getMenus() {
 		Menu menu = application.getMenu(active);
-		if (menu !=null) {
+		if (menu != null) {
 			application.getMenus().forEach(m -> m.setActive(false));
 			menu.setActive(true);
 		}
@@ -283,6 +306,12 @@ class LoginController {
 
 	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
 
+	private final SecurityContextRepository repository;
+
+	public LoginController(SecurityContextRepository repository) {
+		this.repository = repository;
+	}
+
 	@GetMapping
 	public View form() {
 		return new ApplicationView(new LoginPage());
@@ -295,6 +324,7 @@ class LoginController {
 				map.get("username"), "N/A",
 				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(result);
+		repository.saveContext(SecurityContextHolder.getContext(), request, response);
 		handler.onAuthenticationSuccess(request, response, result);
 	}
 
