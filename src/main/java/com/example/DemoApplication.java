@@ -23,14 +23,18 @@ import org.springframework.security.web.authentication.LoginUrlAuthenticationEnt
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.example.Application.Menu;
 
@@ -164,32 +168,61 @@ record Form(String name, Object target, CsrfToken _csrf) {
 @JStache(path = "templates/index.mustache")
 @JStachePartials({ @JStachePartial(name = "layout", path = "templates/layout.mustache"),
 		@JStachePartial(name = "inputField", path = "templates/inputField.mustache") })
-record IndexPage(Application application, Foo foo, BindingResult status, CsrfToken _csrf) {
+class IndexPage extends AttributesHolder {
 
-	public IndexPage(Application application, BindingResult status, CsrfToken _csrf) {
-		this(application, new Foo(), status, _csrf);
+	private final Foo foo;
+
+	public IndexPage(Foo foo) {
+		this.foo = foo;
+	}
+
+	public Foo foo() {
+		return foo;
 	}
 
 	public Form form() {
-		return new Form("foo", foo, _csrf);
+		return new Form("foo", foo, _csrf());
 	}
 
 	public InputField field() {
-		return new InputField("Value", "value", foo.getValue(), "text", status);
-	}
-
-	public List<Menu> getMenus() {
-		return application.getMenus();
+		return new InputField("Value", "value", foo.getValue(), "text", status());
 	}
 
 }
 
-@JStache(path = "templates/login.mustache")
-@JStachePartials(@JStachePartial(name = "layout", path = "templates/layout.mustache"))
-record LoginPage(Application application, CsrfToken _csrf) {
+class AttributesHolder {
+	private Application application;
+	private CsrfToken _csrf;
+	private BindingResult status;
+
+	public void setApplication(Application application) {
+		this.application = application;
+	}
+
+	public void setCsrfToken(CsrfToken _csrf) {
+		this._csrf = _csrf;
+	}
+
+	public void setStatus(BindingResult status) {
+		this.status = status;
+	}
+
 	public List<Menu> getMenus() {
 		return application.getMenus();
 	}
+
+	public CsrfToken _csrf() {
+		return this._csrf;
+	}
+
+	public BindingResult status() {
+		return this.status;
+	}
+}
+
+@JStache(path = "templates/login.mustache")
+@JStachePartials(@JStachePartial(name = "layout", path = "templates/layout.mustache"))
+class LoginPage extends AttributesHolder {
 }
 
 class Foo {
@@ -218,43 +251,31 @@ class Foo {
 
 }
 
-@RestController
+@Controller
 @RequestMapping("/")
 class HomeController {
 
-	private final Application application;
-
-	public HomeController(Application application) {
-		this.application = application;
-	}
-
 	@GetMapping
-	public String home(@ModelAttribute Foo target, @RequestAttribute("_csrf") CsrfToken _csrf) {
-		return JStachio.render(new IndexPage(application, target, null, _csrf));
+	public View home(@ModelAttribute Foo target) {
+		return new ApplicationView(new IndexPage(target));
 	}
 
 	@PostMapping
-	public String post(@ModelAttribute Foo foo, @RequestAttribute("_csrf") CsrfToken _csrf, BindingResult status) {
-		return JStachio.render(new IndexPage(application, foo, status, _csrf));
+	public View post(@ModelAttribute Foo foo) {
+		return new ApplicationView(new IndexPage(foo));
 	}
 
 }
 
-@RestController
+@Controller
 @RequestMapping("/login")
 class LoginController {
 
 	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
 
-	private final Application application;
-
-	public LoginController(Application application) {
-		this.application = application;
-	}
-
 	@GetMapping
-	public String form(@RequestAttribute("_csrf") CsrfToken _csrf) {
-		return JStachio.render(new LoginPage(application, _csrf));
+	public ApplicationView form() {
+		return new ApplicationView(new LoginPage());
 	}
 
 	@PostMapping
@@ -267,4 +288,51 @@ class LoginController {
 		handler.onAuthenticationSuccess(request, response, result);
 	}
 
+}
+
+class ApplicationView implements View {
+
+	private final AttributesHolder attributes;
+
+	public ApplicationView(AttributesHolder attributes) {
+		this.attributes = attributes;
+	}
+
+	@Override
+	public void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
+			throws Exception {
+		response.setContentType("text/html");
+		response.getWriter().print(JStachio.render(attributes));
+	}
+
+	public AttributesHolder getAttributes() {
+		return attributes;
+	}
+}
+
+@Component
+class LayoutAdvice implements HandlerInterceptor, WebMvcConfigurer {
+
+	private final Application application;
+
+	public LayoutAdvice(Application application) {
+		this.application = application;
+	}
+
+	@Override
+	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+			ModelAndView modelAndView) throws Exception {
+		if (modelAndView != null && modelAndView.getView() instanceof ApplicationView) {
+			ApplicationView view = (ApplicationView) modelAndView.getView();
+			view.getAttributes().setApplication(application);
+			view.getAttributes().setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
+			view.getAttributes()
+					.setStatus((BindingResult) modelAndView.getModel().get(BindingResult.MODEL_KEY_PREFIX + "foo"));
+		}
+	}
+
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		registry.addInterceptor(this);
+	}
 }
