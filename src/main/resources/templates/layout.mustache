@@ -16,7 +16,7 @@
 </head>
 <body>
 	<ul class="nav nav-tabs">
-		{{#menus}}<li class="nav-item{{#active}} active{{/active}}"><a class="nav-link" href="{{path}}">{{name}}</a></li>{{/menus}}
+		{{#menus}}<li class="nav-item"><a class="nav-link{{#active}} active{{/active}}" href="{{path}}">{{name}}</a></li>{{/menus}}
 		<li class="nav-item"><a class="nav-link" href="#" onclick="$('#logout').submit()">Logout</a></li>
 	</ul>
 	<div class="container-fluid">
