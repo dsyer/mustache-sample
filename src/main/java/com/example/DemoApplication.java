@@ -2,6 +2,7 @@ package com.example;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -168,7 +170,7 @@ record Form(String name, Object target, CsrfToken _csrf) {
 @JStache(path = "templates/index.mustache")
 @JStachePartials({ @JStachePartial(name = "layout", path = "templates/layout.mustache"),
 		@JStachePartial(name = "inputField", path = "templates/inputField.mustache") })
-class IndexPage extends AttributesHolder {
+class IndexPage extends BasePage {
 
 	private final Foo foo;
 
@@ -185,15 +187,15 @@ class IndexPage extends AttributesHolder {
 	}
 
 	public InputField field() {
-		return new InputField("Value", "value", foo.getValue(), "text", status());
+		return new InputField("Value", "value", foo.getValue(), "text", status("foo"));
 	}
 
 }
 
-class AttributesHolder {
+class BasePage {
 	private Application application;
 	private CsrfToken _csrf;
-	private BindingResult status;
+	private Map<String, BindingResult> status = new HashMap<>();
 
 	public void setApplication(Application application) {
 		this.application = application;
@@ -203,8 +205,8 @@ class AttributesHolder {
 		this._csrf = _csrf;
 	}
 
-	public void setStatus(BindingResult status) {
-		this.status = status;
+	public void setStatus(String name, BindingResult status) {
+		this.status.put(name, status);
 	}
 
 	public List<Menu> getMenus() {
@@ -215,14 +217,14 @@ class AttributesHolder {
 		return this._csrf;
 	}
 
-	public BindingResult status() {
-		return this.status;
+	public BindingResult status(String name) {
+		return this.status.get(name);
 	}
 }
 
 @JStache(path = "templates/login.mustache")
 @JStachePartials(@JStachePartial(name = "layout", path = "templates/layout.mustache"))
-class LoginPage extends AttributesHolder {
+class LoginPage extends BasePage {
 }
 
 class Foo {
@@ -274,7 +276,7 @@ class LoginController {
 	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
 
 	@GetMapping
-	public ApplicationView form() {
+	public View form() {
 		return new ApplicationView(new LoginPage());
 	}
 
@@ -292,21 +294,28 @@ class LoginController {
 
 class ApplicationView implements View {
 
-	private final AttributesHolder attributes;
+	private final BasePage page;
 
-	public ApplicationView(AttributesHolder attributes) {
-		this.attributes = attributes;
+	public ApplicationView(BasePage page) {
+		this.page = page;
 	}
 
 	@Override
 	public void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
 			throws Exception {
+		page.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
+		for (String key : model.keySet()) {
+			if (key.startsWith(BindingResult.MODEL_KEY_PREFIX)) {
+				String name = key.substring(BindingResult.MODEL_KEY_PREFIX.length());
+				page.setStatus(name, (BindingResult) model.get(key));
+			}
+		}
 		response.setContentType("text/html");
-		response.getWriter().print(JStachio.render(attributes));
+		response.getWriter().print(JStachio.render(page));
 	}
 
-	public AttributesHolder getAttributes() {
-		return attributes;
+	public BasePage getPage() {
+		return page;
 	}
 }
 
@@ -324,10 +333,7 @@ class LayoutAdvice implements HandlerInterceptor, WebMvcConfigurer {
 			ModelAndView modelAndView) throws Exception {
 		if (modelAndView != null && modelAndView.getView() instanceof ApplicationView) {
 			ApplicationView view = (ApplicationView) modelAndView.getView();
-			view.getAttributes().setApplication(application);
-			view.getAttributes().setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
-			view.getAttributes()
-					.setStatus((BindingResult) modelAndView.getModel().get(BindingResult.MODEL_KEY_PREFIX + "foo"));
+			view.getPage().setApplication(application);
 		}
 	}
 
