@@ -26,7 +26,6 @@ import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -43,8 +42,6 @@ import com.example.Application.Menu;
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
 import io.jstach.jstache.JStacheFlags.Flag;
-import io.jstach.jstache.JStachePartial;
-import io.jstach.jstache.JStachePartials;
 import io.jstach.jstachio.JStachio;
 
 /**
@@ -167,9 +164,7 @@ class InputField {
 record Form(String name, Object target, CsrfToken _csrf) {
 }
 
-@JStache(path = "templates/index.mustache")
-@JStachePartials({ @JStachePartial(name = "layout", path = "templates/layout.mustache"),
-		@JStachePartial(name = "inputField", path = "templates/inputField.mustache") })
+@JStache(path = "index")
 class IndexPage extends BasePage {
 
 	private final Foo foo;
@@ -222,8 +217,7 @@ class BasePage {
 	}
 }
 
-@JStache(path = "templates/login.mustache")
-@JStachePartials(@JStachePartial(name = "layout", path = "templates/layout.mustache"))
+@JStache(path = "login")
 class LoginPage extends BasePage {
 }
 
