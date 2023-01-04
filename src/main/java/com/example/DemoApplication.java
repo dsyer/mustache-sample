@@ -170,6 +170,7 @@ class IndexPage extends BasePage {
 	private final Foo foo;
 
 	public IndexPage(Foo foo) {
+		activate("home");
 		this.foo = foo;
 	}
 
@@ -191,6 +192,7 @@ class BasePage {
 	private Application application;
 	private CsrfToken _csrf;
 	private Map<String, BindingResult> status = new HashMap<>();
+	private String active = "home";
 
 	public void setApplication(Application application) {
 		this.application = application;
@@ -204,7 +206,16 @@ class BasePage {
 		this.status.put(name, status);
 	}
 
+	public void activate(String name) {
+		this.active = name;
+	}
+
 	public List<Menu> getMenus() {
+		Menu menu = application.getMenu(active);
+		if (menu !=null) {
+			application.getMenus().forEach(m -> m.setActive(false));
+			menu.setActive(true);
+		}
 		return application.getMenus();
 	}
 
@@ -219,6 +230,9 @@ class BasePage {
 
 @JStache(path = "login")
 class LoginPage extends BasePage {
+	public LoginPage() {
+		activate("login");
+	}
 }
 
 class Foo {
