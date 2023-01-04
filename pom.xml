@@ -39,10 +39,6 @@
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-devtools</artifactId>
-		</dependency>
-		<dependency>
 			<groupId>io.jstach</groupId>
 			<artifactId>jstachio</artifactId>
 			<version>${jstach.version}</version>
@@ -67,20 +63,11 @@
 			<artifactId>font-awesome</artifactId>
 			<version>4.7.0</version>
 		</dependency>
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>webjars-locator-core</artifactId>
-		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-configuration-processor</artifactId>
-			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

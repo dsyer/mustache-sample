@@ -66,6 +66,7 @@ public class DemoApplication {
 		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
 		return http.build();
 	}
+
 	@Bean
 	public HttpSessionSecurityContextRepository sessionRepository() {
 		return new HttpSessionSecurityContextRepository();
