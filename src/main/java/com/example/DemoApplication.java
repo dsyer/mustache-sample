@@ -54,7 +54,7 @@ public class DemoApplication {
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http.authorizeRequests().antMatchers("/login", "/error", "/webjars/**")
+		http.authorizeHttpRequests().antMatchers("/login", "/error", "/webjars/**")
 				.permitAll().antMatchers("/**").authenticated().and().exceptionHandling()
 				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
 		return http.build();
