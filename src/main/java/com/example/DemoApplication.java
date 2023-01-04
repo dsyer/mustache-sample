@@ -11,9 +11,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -27,6 +24,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -42,6 +43,9 @@ import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 /**
  * @author Dave Syer
  *
@@ -50,11 +54,18 @@ import com.samskivert.mustache.Template.Fragment;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http.authorizeRequests().antMatchers("/login", "/error", "/webjars/**")
-				.permitAll().antMatchers("/**").authenticated().and().exceptionHandling()
+	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository) throws Exception {
+		http.authorizeHttpRequests()
+				.requestMatchers("/login", "/error", "/webjars/**")
+				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling()
 				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
 		return http.build();
+	}
+
+	@Bean
+	public HttpSessionSecurityContextRepository sessionRepository() {
+		return new HttpSessionSecurityContextRepository();
 	}
 
 	public static void main(String[] args) {
@@ -336,6 +347,12 @@ class LoginController {
 
 	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
 
+	private final SecurityContextRepository repository;
+
+	public LoginController(SecurityContextRepository repository) {
+		this.repository = repository;
+	}
+
 	@GetMapping
 	public String form() {
 		return "login";
@@ -348,6 +365,7 @@ class LoginController {
 				map.get("username"), "N/A",
 				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
 		SecurityContextHolder.getContext().setAuthentication(result);
+		repository.saveContext(SecurityContextHolder.getContext(), request, response);
 		handler.onAuthenticationSuccess(request, response, result);
 	}
 
