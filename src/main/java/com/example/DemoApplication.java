@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -34,18 +35,16 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.HandlerInterceptor;
-import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.View;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import com.example.Application.Menu;
+import com.example.mustache.ApplicationView;
+import com.example.mustache.Page;
+import com.example.mustache.PageConfigurer;
 
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
 import io.jstach.jstache.JStacheFlags.Flag;
-import io.jstach.jstachio.JStachio;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -212,12 +211,13 @@ class IndexPage extends BasePage {
 
 }
 
-class BasePage {
+class BasePage implements Page {
 	private Application application;
 	private CsrfToken _csrf;
 	private Map<String, BindingResult> status = new HashMap<>();
 	private String active = "home";
 
+	@Autowired
 	public void setApplication(Application application) {
 		this.application = application;
 	}
@@ -331,53 +331,27 @@ class LoginController {
 
 }
 
-class ApplicationView implements View {
-
-	private final BasePage page;
-
-	public ApplicationView(BasePage page) {
-		this.page = page;
-	}
-
-	@Override
-	public void render(Map<String, ?> model, HttpServletRequest request, HttpServletResponse response)
-			throws Exception {
-		page.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
-		for (String key : model.keySet()) {
-			if (key.startsWith(BindingResult.MODEL_KEY_PREFIX)) {
-				String name = key.substring(BindingResult.MODEL_KEY_PREFIX.length());
-				page.setStatus(name, (BindingResult) model.get(key));
-			}
-		}
-		response.setContentType("text/html");
-		response.getWriter().print(JStachio.render(page));
-	}
-
-	public BasePage getPage() {
-		return page;
-	}
-}
-
 @Component
-class LayoutAdvice implements HandlerInterceptor, WebMvcConfigurer {
+class ApplicationPageConfigurer implements PageConfigurer {
 
 	private final Application application;
 
-	public LayoutAdvice(Application application) {
+	public ApplicationPageConfigurer(Application application) {
 		this.application = application;
 	}
-
 	@Override
-	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
-			ModelAndView modelAndView) throws Exception {
-		if (modelAndView != null && modelAndView.getView() instanceof ApplicationView) {
-			ApplicationView view = (ApplicationView) modelAndView.getView();
-			view.getPage().setApplication(application);
+	public void configure(Page page, Map<String, ?> model, HttpServletRequest request) {
+		if (page instanceof BasePage) {
+			BasePage base = (BasePage)page;
+			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
+			for (String key : model.keySet()) {
+				if (key.startsWith(BindingResult.MODEL_KEY_PREFIX)) {
+					String name = key.substring(BindingResult.MODEL_KEY_PREFIX.length());
+					base.setStatus(name, (BindingResult) model.get(key));
+				}
+			}
+			base.setApplication(application);
 		}
 	}
 
-	@Override
-	public void addInterceptors(InterceptorRegistry registry) {
-		registry.addInterceptor(this);
-	}
 }
