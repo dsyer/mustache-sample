@@ -38,13 +38,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.View;
 
 import com.example.Application.Menu;
-import com.example.mustache.ApplicationView;
-import com.example.mustache.Page;
 import com.example.mustache.PageConfigurer;
 
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
+import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheFlags.Flag;
+import io.jstach.jstache.JStacheLambda.Raw;
+import io.jstach.jstachio.JStachio;
+import io.jstach.opt.spring.webmvc.JStachioModelView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -154,6 +156,7 @@ class Application {
 
 }
 
+@JStache(path = "inputField")
 class InputField {
 
 	public String label;
@@ -209,9 +212,15 @@ class IndexPage extends BasePage {
 		return new InputField("Value", "value", foo.getValue(), "text", status("foo"));
 	}
 
+	@JStacheLambda
+	@Raw
+	public String render(InputField field) {
+		return JStachio.render(field);
+	}
+
 }
 
-class BasePage implements Page {
+class BasePage {
 	private Application application;
 	private CsrfToken _csrf;
 	private Map<String, BindingResult> status = new HashMap<>();
@@ -291,12 +300,12 @@ class HomeController {
 
 	@GetMapping
 	public View home(@ModelAttribute Foo target) {
-		return new ApplicationView(new IndexPage(target));
+		return JStachioModelView.of(new IndexPage(target));
 	}
 
 	@PostMapping
 	public View post(@ModelAttribute Foo foo) {
-		return new ApplicationView(new IndexPage(foo));
+		return JStachioModelView.of(new IndexPage(foo));
 	}
 
 }
@@ -315,7 +324,7 @@ class LoginController {
 
 	@GetMapping
 	public View form() {
-		return new ApplicationView(new LoginPage());
+		return JStachioModelView.of(new LoginPage());
 	}
 
 	@PostMapping
@@ -340,7 +349,7 @@ class ApplicationPageConfigurer implements PageConfigurer {
 		this.application = application;
 	}
 	@Override
-	public void configure(Page page, Map<String, ?> model, HttpServletRequest request) {
+	public void configure(Object page, Map<String, ?> model, HttpServletRequest request) {
 		if (page instanceof BasePage) {
 			BasePage base = (BasePage)page;
 			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));

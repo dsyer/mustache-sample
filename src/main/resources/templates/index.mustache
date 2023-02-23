@@ -4,21 +4,7 @@
 		<div class="col-sm-offset-2 col-sm-10">Hello World</div>
 		{{#form}}<form method="post">
 			<div class="form-group has-feedback">
-				{{#field}}
-				<div class="form-group{{^valid}} has-error{{/valid}}">
-					<label class="col-sm-2 control-label">{{label}}</label>
-					<div class="col-sm-4">
-						<input class="form-control" type="text" name="{{name}}" value="{{value}}"/>
-						{{#valid}}<span
-							class="fa fa-check valid-feedback"
-							aria-hidden="true"></span>{{/valid}}
-						{{^valid}}<span
-							class="fa fa-remove invalid-feedback"
-							aria-hidden="true"></span>
-							{{#errors}}<span class="help-inline">{{.}}</span>{{/errors}}{{/valid}}
-					</div>
-				</div>
-				{{/field}}
+				{{#field}}{{#render}}{{/render}}{{/field}}
 				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
 			</div>
 			<div class="form-group">

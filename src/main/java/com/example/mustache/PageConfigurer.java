@@ -6,6 +6,6 @@ import jakarta.servlet.http.HttpServletRequest;
 
 public interface PageConfigurer {
 
-	void configure(Page page, Map<String, ?> model, HttpServletRequest request);
+	void configure(Object page, Map<String, ?> model, HttpServletRequest request);
 
 }
