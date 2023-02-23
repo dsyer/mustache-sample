@@ -29,21 +29,22 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
-import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.View;
+import org.springframework.web.servlet.support.BindStatus;
+import org.springframework.web.servlet.support.RequestContext;
 
 import com.example.Application.Menu;
 import com.example.mustache.PageConfigurer;
 
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
-import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheFlags.Flag;
+import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstachio.JStachio;
 import io.jstach.opt.spring.webmvc.JStachioModelView;
@@ -169,18 +170,17 @@ class InputField {
 
 	public String value;
 
-	public List<String> errors = Collections.emptyList();
+	public String[] errors = new String[0];
 
-	public InputField(String label, String name, String value, String type, BindingResult status) {
+	public InputField(String label, String name, String value, String type, BindStatus status) {
 		this.label = label;
 		this.name = name;
 		this.value = value == null ? "" : value;
 		if (status != null) {
-			valid = !status.hasFieldErrors(name);
-			errors = status.getFieldErrors(name).stream()
-					.map(error -> error.getDefaultMessage()).collect(Collectors.toList());
-			value = status.getFieldValue(name) == null ? ""
-					: status.getFieldValue(name).toString();
+			valid = !status.isError();
+			errors = status.getErrorMessages();
+			value = status.getValue() == null ? ""
+					: status.getValue().toString();
 		}
 		this.date = "date".equals(type);
 	}
@@ -223,8 +223,8 @@ class IndexPage extends BasePage {
 class BasePage {
 	private Application application;
 	private CsrfToken _csrf;
-	private Map<String, BindingResult> status = new HashMap<>();
 	private String active = "home";
+	private RequestContext context;
 
 	@Autowired
 	public void setApplication(Application application) {
@@ -233,10 +233,6 @@ class BasePage {
 
 	public void setCsrfToken(CsrfToken _csrf) {
 		this._csrf = _csrf;
-	}
-
-	public void setStatus(String name, BindingResult status) {
-		this.status.put(name, status);
 	}
 
 	public void activate(String name) {
@@ -256,9 +252,18 @@ class BasePage {
 		return this._csrf;
 	}
 
-	public BindingResult status(String name) {
-		return this.status.get(name);
+	public BindStatus status(String name) {
+		return this.context.getBindStatus(name + ".*");
 	}
+
+	public BindStatus status(String name, String field) {
+		return this.context.getBindStatus(name + "." + field);
+	}
+	
+	public void setRequestContext(RequestContext context) {
+		this.context = context;
+	}
+
 }
 
 @JStache(path = "login")
@@ -353,12 +358,8 @@ class ApplicationPageConfigurer implements PageConfigurer {
 		if (page instanceof BasePage) {
 			BasePage base = (BasePage)page;
 			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
-			for (String key : model.keySet()) {
-				if (key.startsWith(BindingResult.MODEL_KEY_PREFIX)) {
-					String name = key.substring(BindingResult.MODEL_KEY_PREFIX.length());
-					base.setStatus(name, (BindingResult) model.get(key));
-				}
-			}
+			Map<String, Object> map = new HashMap<>(model);
+			base.setRequestContext(new RequestContext(request, map));
 			base.setApplication(application);
 		}
 	}
