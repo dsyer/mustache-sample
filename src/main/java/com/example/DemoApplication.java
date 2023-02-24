@@ -1,11 +1,10 @@
 package com.example;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -44,6 +43,7 @@ import com.example.mustache.PageConfigurer;
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
 import io.jstach.jstache.JStacheFlags.Flag;
+import io.jstach.jstache.JStacheFormatterTypes;
 import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstachio.JStachio;
@@ -57,6 +57,7 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 @SpringBootApplication
 @JStacheFlags(flags = Flag.DEBUG)
+@JStacheFormatterTypes(types = LocalDate.class)
 public class DemoApplication {
 
 	@Bean
@@ -212,10 +213,8 @@ class IndexPage extends BasePage {
 		return new InputField("Value", "value", foo.getValue(), "text", status("foo"));
 	}
 
-	@JStacheLambda
-	@Raw
-	public String render(InputField field) {
-		return JStachio.render(field);
+	public InputField date() {
+		return new InputField("Date", "date", foo.getDate().toString(), "date", status("foo", "date"));
 	}
 
 }
@@ -264,6 +263,12 @@ class BasePage {
 		this.context = context;
 	}
 
+	@JStacheLambda
+	@Raw
+	public String render(Object field) {
+		return JStachio.render(field);
+	}
+
 }
 
 @JStache(path = "login")
@@ -276,6 +281,8 @@ class LoginPage extends BasePage {
 class Foo {
 
 	private String value = "";
+
+	private LocalDate date = LocalDate.now();
 
 	public Foo() {
 	}
@@ -290,6 +297,18 @@ class Foo {
 
 	public void setValue(String value) {
 		this.value = value;
+	}
+
+	public String date() {
+		return date.toString();
+	}
+
+	public LocalDate getDate() {
+		return date;
+	}
+
+	public void setDate(LocalDate date) {
+		this.date = date;
 	}
 
 	@Override

@@ -5,6 +5,7 @@
 		{{#form}}<form method="post">
 			<div class="form-group has-feedback">
 				{{#field}}{{#render}}{{/render}}{{/field}}
+				{{#date}}{{#render}}{{/render}}{{/date}}
 				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
 			</div>
 			<div class="form-group">
@@ -14,7 +15,8 @@
 			</div>
 		</form>{{/form}}
 	</div>
-	{{#foo.value}}<div class="container">
-		<div class="col-sm-offset-2 col-sm-10">Value is: {{.}}</div>
-	</div>{{/foo.value}}
+	{{#foo}}<div class="container">
+		<div class="col-sm-offset-2 col-sm-10">Value is: {{value}}</div>
+		<div class="col-sm-offset-2 col-sm-10">Date is: {{date}}</div>
+	</div>{{/foo}}
 {{/body}}{{/layout}}
