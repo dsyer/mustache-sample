@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.context.annotation.RequestScope;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.support.BindStatus;
 import org.springframework.web.servlet.support.RequestContext;
@@ -266,6 +267,38 @@ class BasePage {
 
 }
 
+@Component("error")
+@RequestScope
+class ErrorPageView implements JStachioModelView {
+
+	private ErrorPage page = new ErrorPage();
+
+	@Override
+	public Object model() {
+		return this.page;
+	}
+
+	@Override
+	public String getContentType() {
+		return contentType();
+	}
+
+}
+
+@JStache(path = "error")
+class ErrorPage extends BasePage {
+	private String message = "Oops!";
+	public ErrorPage() {
+		activate("home");
+	}
+	public String getMessage() {
+		return message;
+	}
+	public void setMessage(String message) {
+		this.message = message;
+	}
+}
+
 @JStache(path = "login")
 class LoginPage extends BasePage {
 	public LoginPage() {
@@ -375,6 +408,9 @@ class ApplicationPageConfigurer implements PageConfigurer {
 			Map<String, Object> map = new HashMap<>(model);
 			base.setRequestContext(new RequestContext(request, map));
 			base.setApplication(application);
+		}
+		if (page instanceof ErrorPage) {
+			((ErrorPage) page).setMessage((String) model.get("error"));
 		}
 	}
 

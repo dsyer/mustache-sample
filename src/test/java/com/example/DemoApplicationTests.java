@@ -55,12 +55,12 @@ public class DemoApplicationTests {
 	public void errorPage() {
 		login();
 		RequestEntity<?> request = RequestEntity.get("http://localhost:" + port + "/no-such-path")
-				.header("cookie", this.cookie).build();
+				.header("cookie", this.cookie).header(HttpHeaders.ACCEPT, "text/html").build();
 		ResponseEntity<String> response = rest
 				.exchange(request, String.class);
-		// Default JSON response
-		assertThat(response.getBody()).contains("\"timestamp\"");
-		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+				assertThat(response.getBody()).contains("nav-tabs");
+				assertThat(response.getBody()).contains("Not Found");
+				assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	private HttpHeaders cookie(HttpHeaders headers) {
