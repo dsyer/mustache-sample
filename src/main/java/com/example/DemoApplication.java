@@ -41,9 +41,6 @@ import com.example.Application.Menu;
 import com.example.mustache.PageConfigurer;
 
 import io.jstach.jstache.JStache;
-import io.jstach.jstache.JStacheFlags;
-import io.jstach.jstache.JStacheFlags.Flag;
-import io.jstach.jstache.JStacheFormatterTypes;
 import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstachio.JStachio;
@@ -56,8 +53,6 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  */
 @SpringBootApplication
-@JStacheFlags(flags = Flag.DEBUG)
-@JStacheFormatterTypes(types = LocalDate.class)
 public class DemoApplication {
 
 	@Bean
