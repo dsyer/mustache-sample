@@ -1,5 +1,10 @@
 package com.example;
 
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +32,8 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
+import org.springframework.security.web.server.context.ServerSecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -35,11 +42,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.context.annotation.RequestScope;
-import org.springframework.web.servlet.View;
-import org.springframework.web.servlet.support.BindStatus;
-import org.springframework.web.servlet.support.RequestContext;
+import org.springframework.web.reactive.result.view.BindStatus;
+import org.springframework.web.reactive.result.view.RequestContext;
+import org.springframework.web.reactive.result.view.View;
+import org.springframework.web.server.ServerWebExchange;
 
 import com.example.Application.Menu;
+import com.example.mustache.JStachioModelView;
+import com.example.mustache.JStachioModelViewConfigurer;
+import com.example.mustache.ViewSetupBeanPostProcessor;
 
 import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
@@ -49,11 +60,6 @@ import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstache.JStachePath;
 import io.jstach.jstachio.JStachio;
-import io.jstach.opt.spring.webmvc.JStachioModelView;
-import io.jstach.opt.spring.webmvc.JStachioModelViewConfigurer;
-import io.jstach.opt.spring.webmvc.ViewSetupHandlerInterceptor;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author Dave Syer
@@ -81,8 +87,8 @@ public class DemoApplication {
 	}
 
 	@Bean
-	public ViewSetupHandlerInterceptor viewSetupHandlerInterceptor(ApplicationContext context) {
-		return new ViewSetupHandlerInterceptor(context);
+	public ViewSetupBeanPostProcessor viewSetupBeanPostProcessor(ApplicationContext context) {
+		return new ViewSetupBeanPostProcessor(context);
 	}
 
 	public static void main(String[] args) {
@@ -292,11 +298,6 @@ class ErrorPageView implements JStachioModelView {
 		return this.page;
 	}
 
-	@Override
-	public String getContentType() {
-		return contentType();
-	}
-
 }
 
 @JStache(path = "error")
@@ -383,28 +384,9 @@ class HomeController {
 @RequestMapping("/login")
 class LoginController {
 
-	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
-
-	private final SecurityContextRepository repository;
-
-	public LoginController(SecurityContextRepository repository) {
-		this.repository = repository;
-	}
-
 	@GetMapping
 	public View form() {
 		return JStachioModelView.of(new LoginPage());
-	}
-
-	@PostMapping
-	public void authenticate(@RequestParam Map<String, String> map,
-			HttpServletRequest request, HttpServletResponse response) throws Exception {
-		Authentication result = new UsernamePasswordAuthenticationToken(
-				map.get("username"), "N/A",
-				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
-		SecurityContextHolder.getContext().setAuthentication(result);
-		repository.saveContext(SecurityContextHolder.getContext(), request, response);
-		handler.onAuthenticationSuccess(request, response, result);
 	}
 
 }
@@ -419,12 +401,12 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 	}
 
 	@Override
-	public void configure(Object page, Map<String, ?> model, HttpServletRequest request) {
+	public void configure(Object page, RequestContext request) {
 		if (page instanceof BasePage) {
 			BasePage base = (BasePage) page;
 			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
 			Map<String, Object> map = new HashMap<>(model);
-			base.setRequestContext(new RequestContext(request, map));
+			base.setRequestContext(request);
 			base.setApplication(application);
 		}
 		if (page instanceof ErrorPage) {
