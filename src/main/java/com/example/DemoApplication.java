@@ -11,23 +11,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -36,15 +27,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import com.example.Application.Menu;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
-
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author Dave Syer
@@ -54,18 +41,19 @@ import jakarta.servlet.http.HttpServletResponse;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository) throws Exception {
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http.authorizeHttpRequests()
 				.requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling(handling -> handling
-				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
-		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
+				.permitAll().requestMatchers("/**").authenticated().and()
+				.formLogin(login -> login.loginPage("/login"));
 		return http.build();
 	}
 
 	@Bean
-	public HttpSessionSecurityContextRepository sessionRepository() {
-		return new HttpSessionSecurityContextRepository();
+	public InMemoryUserDetailsManager inMemoryUserDetailsManager() {
+		return new InMemoryUserDetailsManager(
+				User.withUsername("foo").password("{noop}bar")
+						.roles(new String[] { "USER" }).build());
 	}
 
 	public static void main(String[] args) {
@@ -150,7 +138,6 @@ class LayoutAdvice {
 
 	private Application application;
 
-	@Autowired
 	public LayoutAdvice(Compiler compiler, Application application) {
 		this.compiler = compiler;
 		this.application = application;
@@ -345,28 +332,9 @@ class HomeController {
 @RequestMapping("/login")
 class LoginController {
 
-	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
-
-	private final SecurityContextRepository repository;
-
-	public LoginController(SecurityContextRepository repository) {
-		this.repository = repository;
-	}
-
 	@GetMapping
 	public String form() {
 		return "login";
-	}
-
-	@PostMapping
-	public void authenticate(@RequestParam Map<String, String> map,
-			HttpServletRequest request, HttpServletResponse response) throws Exception {
-		Authentication result = new UsernamePasswordAuthenticationToken(
-				map.get("username"), "N/A",
-				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
-		SecurityContextHolder.getContext().setAuthentication(result);
-		repository.saveContext(SecurityContextHolder.getContext(), request, response);
-		handler.onAuthenticationSuccess(request, response, result);
 	}
 
 }
