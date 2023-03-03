@@ -23,7 +23,7 @@
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<java.version>17</java.version>
-		<jstach.version>0.9.3</jstach.version>
+		<jstach.version>1.0.0-SNAPSHOT</jstach.version>
 	</properties>
 
 	<dependencies>

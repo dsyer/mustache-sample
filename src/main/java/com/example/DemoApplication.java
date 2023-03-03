@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -39,13 +40,18 @@ import org.springframework.web.servlet.support.BindStatus;
 import org.springframework.web.servlet.support.RequestContext;
 
 import com.example.Application.Menu;
-import com.example.mustache.PageConfigurer;
 
 import io.jstach.jstache.JStache;
+import io.jstach.jstache.JStacheFlags;
+import io.jstach.jstache.JStacheFlags.Flag;
+import io.jstach.jstache.JStacheFormatterTypes;
 import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
+import io.jstach.jstache.JStachePath;
 import io.jstach.jstachio.JStachio;
 import io.jstach.opt.spring.webmvc.JStachioModelView;
+import io.jstach.opt.spring.webmvc.JStachioModelViewConfigurer;
+import io.jstach.opt.spring.webmvc.ViewSetupHandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
@@ -54,14 +60,17 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  */
 @SpringBootApplication
+@JStachePath(prefix = "templates/", suffix = ".mustache")
+@JStacheFlags(flags = Flag.DEBUG)
+@JStacheFormatterTypes(types = LocalDate.class)
 public class DemoApplication {
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository)
 			throws Exception {
 		http.authorizeHttpRequests().requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling()
-				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling(handling -> handling
+						.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
 		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
 		return http.build();
 	}
@@ -69,6 +78,11 @@ public class DemoApplication {
 	@Bean
 	public HttpSessionSecurityContextRepository sessionRepository() {
 		return new HttpSessionSecurityContextRepository();
+	}
+
+	@Bean
+	public ViewSetupHandlerInterceptor viewSetupHandlerInterceptor(ApplicationContext context) {
+		return new ViewSetupHandlerInterceptor(context);
 	}
 
 	public static void main(String[] args) {
@@ -254,7 +268,7 @@ class BasePage {
 	public BindStatus status(String name, String field) {
 		return this.context.getBindStatus(name + "." + field);
 	}
-	
+
 	public void setRequestContext(RequestContext context) {
 		this.context = context;
 	}
@@ -288,12 +302,15 @@ class ErrorPageView implements JStachioModelView {
 @JStache(path = "error")
 class ErrorPage extends BasePage {
 	private String message = "Oops!";
+
 	public ErrorPage() {
 		activate("home");
 	}
+
 	public String getMessage() {
 		return message;
 	}
+
 	public void setMessage(String message) {
 		this.message = message;
 	}
@@ -393,17 +410,18 @@ class LoginController {
 }
 
 @Component
-class ApplicationPageConfigurer implements PageConfigurer {
+class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 
 	private final Application application;
 
 	public ApplicationPageConfigurer(Application application) {
 		this.application = application;
 	}
+
 	@Override
 	public void configure(Object page, Map<String, ?> model, HttpServletRequest request) {
 		if (page instanceof BasePage) {
-			BasePage base = (BasePage)page;
+			BasePage base = (BasePage) page;
 			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
 			Map<String, Object> map = new HashMap<>(model);
 			base.setRequestContext(new RequestContext(request, map));
