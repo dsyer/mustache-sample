@@ -57,8 +57,8 @@ public class DemoApplication {
 	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository) throws Exception {
 		http.authorizeHttpRequests()
 				.requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling()
-				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling(handling -> handling
+				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
 		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
 		return http.build();
 	}
