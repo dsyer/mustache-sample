@@ -15,10 +15,13 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.reactive.result.view.CsrfRequestDataValueProcessor;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
@@ -27,11 +30,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.server.ServerWebExchange;
 
 import com.example.Application.Menu;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
+
+import reactor.core.publisher.Mono;
 
 /**
  * @author Dave Syer
@@ -41,18 +47,19 @@ import com.samskivert.mustache.Template.Fragment;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http.authorizeHttpRequests()
-				.requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and()
-				.formLogin(login -> login.loginPage("/login"));
+	public SecurityWebFilterChain filterChain(ServerHttpSecurity http) throws Exception {
+		http.authorizeExchange(exchange -> exchange
+				.pathMatchers("/login", "/error", "/webjars/**")
+				.permitAll().pathMatchers("/**").authenticated().and()
+				.formLogin(login -> login.loginPage("/login")));
 		return http.build();
 	}
 
 	@Bean
-	public InMemoryUserDetailsManager inMemoryUserDetailsManager() {
-		return new InMemoryUserDetailsManager(
-				User.withUsername("foo").password("{noop}bar")
+	@SuppressWarnings("deprecation")
+	public MapReactiveUserDetailsService inMemoryUserDetailsManager() {
+		return new MapReactiveUserDetailsService(
+				User.withDefaultPasswordEncoder().username("foo").password("bar")
 						.roles(new String[] { "USER" }).build());
 	}
 
@@ -143,16 +150,22 @@ class LayoutAdvice {
 		this.application = application;
 	}
 
-	@ModelAttribute("menus")
-	public Iterable<Menu> menus(@ModelAttribute Layout layout) {
+	@ModelAttribute("layout")
+	public Layout layout(Map<String, Object> model) {
+		Layout layout = new Layout(compiler);
+		model.put("menus", menus(layout));
+		model.put("menu", menu(layout));
+		return layout;
+	}
+
+	private Iterable<Menu> menus(Layout layout) {
 		for (Menu menu : application.getMenus()) {
 			menu.setActive(false);
 		}
 		return application.getMenus();
 	}
 
-	@ModelAttribute("menu")
-	public Mustache.Lambda menu(@ModelAttribute Layout layout) {
+	private Mustache.Lambda menu(Layout layout) {
 		return (frag, out) -> {
 			Menu menu = application.getMenu(frag.execute());
 			menu.setActive(true);
@@ -181,6 +194,11 @@ class LayoutAdvice {
 		return matcher.matches() ? matcher.group(1) : fallback;
 	}
 
+	@ModelAttribute("_csrf")
+	Mono<CsrfToken> csrfToken(ServerWebExchange exchange) {
+		return exchange.getAttribute(CsrfToken.class.getName());
+	}
+
 	@ModelAttribute("form")
 	public Map<String, Form> form(Map<String, Object> model) {
 		return new LinkedHashMap<String, Form>() {
@@ -201,11 +219,6 @@ class LayoutAdvice {
 			}
 
 		};
-	}
-
-	@ModelAttribute("layout")
-	public Mustache.Lambda layout(Map<String, Object> model) {
-		return new Layout(compiler);
 	}
 
 }
