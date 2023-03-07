@@ -1,13 +1,7 @@
 package com.example;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,28 +13,18 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.security.web.context.SecurityContextRepository;
-import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.server.authentication.RedirectServerAuthenticationSuccessHandler;
-import org.springframework.security.web.server.context.ServerSecurityContextRepository;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.web.server.SecurityWebFilterChain;
+import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.context.annotation.RequestScope;
 import org.springframework.web.reactive.result.view.BindStatus;
 import org.springframework.web.reactive.result.view.RequestContext;
@@ -60,6 +44,7 @@ import io.jstach.jstache.JStacheLambda;
 import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstache.JStachePath;
 import io.jstach.jstachio.JStachio;
+import reactor.core.publisher.Mono;
 
 /**
  * @author Dave Syer
@@ -72,18 +57,20 @@ import io.jstach.jstachio.JStachio;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository)
-			throws Exception {
-		http.authorizeHttpRequests().requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling(handling -> handling
-						.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
-		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
+	public SecurityWebFilterChain filterChain(ServerHttpSecurity http) throws Exception {
+		http.authorizeExchange(exchange -> exchange
+				.pathMatchers("/login", "/error", "/webjars/**")
+				.permitAll().pathMatchers("/**").authenticated().and()
+				.formLogin(login -> login.loginPage("/login")));
 		return http.build();
 	}
 
 	@Bean
-	public HttpSessionSecurityContextRepository sessionRepository() {
-		return new HttpSessionSecurityContextRepository();
+	@SuppressWarnings("deprecation")
+	public MapReactiveUserDetailsService inMemoryUserDetailsManager() {
+		return new MapReactiveUserDetailsService(
+				User.withDefaultPasswordEncoder().username("foo").password("bar")
+						.roles(new String[] { "USER" }).build());
 	}
 
 	@Bean
@@ -173,6 +160,15 @@ class Application {
 	}
 
 }
+
+@ControllerAdvice
+class LayoutAdvice {
+	@ModelAttribute("_csrf")
+	Mono<CsrfToken> csrfToken(ServerWebExchange exchange) {
+		return exchange.getAttribute(CsrfToken.class.getName());
+	}
+}
+
 
 @JStache(path = "inputField")
 class InputField {
@@ -396,18 +392,19 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 
 	private final Application application;
 
-	public ApplicationPageConfigurer(Application application) {
+	public ApplicationPageConfigurer( Application application) {
 		this.application = application;
 	}
 
 	@Override
-	public void configure(Object page, RequestContext request) {
-		if (page instanceof BasePage) {
-			BasePage base = (BasePage) page;
-			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
-			Map<String, Object> map = new HashMap<>(model);
-			base.setRequestContext(request);
+	public void configure(Object page, Map<String, Object> model, ServerWebExchange request) {
+		if (page instanceof BasePage base) {
+			base.setRequestContext(new RequestContext(request, model, request.getApplicationContext()));
 			base.setApplication(application);
+			CsrfToken token = (CsrfToken) model.get("_csrf");
+			if (token != null) {
+				base.setCsrfToken(token);
+			}
 		}
 		if (page instanceof ErrorPage) {
 			((ErrorPage) page).setMessage((String) model.get("error"));

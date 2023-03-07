@@ -1,10 +1,12 @@
 package com.example.mustache;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.MediaType;
+import org.springframework.web.reactive.result.view.AbstractView;
 import org.springframework.web.reactive.result.view.View;
 import org.springframework.web.server.ServerWebExchange;
 
@@ -16,21 +18,36 @@ public interface JStachioModelView extends View {
 
 	@Override
 	default Mono<Void> render(Map<String, ?> model, MediaType contentType, ServerWebExchange exchange) {
+
 		if (contentType != null) {
 			exchange.getResponse().getHeaders().setContentType(contentType);
 		}
-		return exchange.getResponse().writeWith(Mono.fromCallable(() -> {
-			try {
-				byte[] bytes = String.valueOf(JStachio.render(model())).getBytes(StandardCharsets.UTF_8);
-				return exchange.getResponse().bufferFactory().wrap(bytes); // just
-																			// wrapping,
-																			// no
-																			// allocation
+
+		View view = new AbstractView() {
+
+			@Override
+			protected Mono<Void> renderInternal(Map<String, Object> model, MediaType contentType,
+					ServerWebExchange exchange) {
+				List<JStachioModelViewConfigurer> configurers = exchange
+						.getAttributeOrDefault(ViewSetupBeanPostProcessor.CONFIGURERS, Collections.emptyList());
+				for (JStachioModelViewConfigurer configurer : configurers) {
+					configurer.configure(model(), model, exchange);
+				}
+				return exchange.getResponse().writeWith(Mono.fromCallable(() -> {
+					try {
+						byte[] bytes = String.valueOf(JStachio.render(model())).getBytes(StandardCharsets.UTF_8);
+						// just wrapping, no allocation
+						return exchange.getResponse().bufferFactory().wrap(bytes);
+					} catch (Exception ex) {
+						throw new IllegalStateException("Failed to render script template", ex);
+					}
+				}));
 			}
-			catch (Exception ex) {
-				throw new IllegalStateException("Failed to render script template", ex);
-			}
-		}));
+
+		};
+
+		return view.render(model, contentType, exchange);
+
 	}
 
 	@Override
@@ -40,6 +57,7 @@ public interface JStachioModelView extends View {
 
 	/**
 	 * The model to be rendered by {@link #jstachio()}.
+	 * 
 	 * @return model defaulting to <code>this</code> instance.
 	 */
 	default Object model() {
@@ -48,6 +66,7 @@ public interface JStachioModelView extends View {
 
 	/**
 	 * Creates a spring view from a model
+	 * 
 	 * @param model an instance of a class annotated with {@link JStache}.
 	 * @return view ready for rendering
 	 */

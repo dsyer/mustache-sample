@@ -87,10 +87,11 @@ public class DemoApplicationTests {
 		HttpEntity<MultiValueMap<String, String>> request = request("/login");
 		MultiValueMap<String, String> map = request.getBody();
 		map.add("username", "foo");
-		map.add("password", "");
+		map.add("password", "bar");
 		ResponseEntity<String> response = rest
 				.postForEntity("http://localhost:" + port + "/login",
 						request, String.class);
+		cookie(response.getHeaders());
 		return response;
 	}
 

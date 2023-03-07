@@ -27,6 +27,8 @@ import reactor.core.publisher.Mono;
  */
 public class ViewSetupBeanPostProcessor implements BeanPostProcessor {
 
+	public static final String CONFIGURERS = JStachioModelViewConfigurer.class.getName();
+
 	private final ApplicationContext context;
 
 	public ViewSetupBeanPostProcessor(ApplicationContext context) {
@@ -68,18 +70,14 @@ public class ViewSetupBeanPostProcessor implements BeanPostProcessor {
 
 		@Override
 		public int getOrder() {
-			return this.delegate == null ? Ordered.HIGHEST_PRECEDENCE + 10 : this.delegate.getOrder();
+			return this.delegate.getOrder();
 		}
 
 		@Override
 		public Mono<Void> handleResult(ServerWebExchange exchange, HandlerResult result) {
 			JStachioModelView view = findView(result.getReturnValue());
 			if (view != null) {
-				Object page = view.model();
-				RequestContext request = createRequestContext(exchange, result.getModel().asMap());
-				for (JStachioModelViewConfigurer configurer : configurers) {
-					configurer.configure(page, request);
-				}
+				exchange.getAttributes().put(CONFIGURERS, this.configurers);
 			}
 			return this.delegate.handleResult(exchange, result);
 		}

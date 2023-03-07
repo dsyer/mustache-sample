@@ -1,7 +1,9 @@
 package com.example.mustache;
 
-import org.springframework.web.reactive.result.view.RequestContext;
+import java.util.Map;
+
+import org.springframework.web.server.ServerWebExchange;
 
 public interface JStachioModelViewConfigurer {
-	void configure(Object page, RequestContext request);
+	void configure(Object page, Map<String, Object> model, ServerWebExchange request);
 }
