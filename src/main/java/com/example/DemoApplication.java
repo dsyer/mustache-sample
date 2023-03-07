@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.web.error.ErrorAttributeOptions;
+import org.springframework.boot.web.reactive.error.DefaultErrorAttributes;
+import org.springframework.boot.web.reactive.error.ErrorAttributes;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
@@ -23,19 +26,19 @@ import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.reactive.HandlerResult;
+import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.example.Application.Menu;
+import com.example.webflux.HandlerResultInterceptor;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
-
-import reactor.core.publisher.Mono;
 
 /**
  * @author Dave Syer
@@ -47,7 +50,7 @@ public class DemoApplication {
 	@Bean
 	public SecurityWebFilterChain filterChain(ServerHttpSecurity http) throws Exception {
 		http.authorizeExchange(exchange -> exchange
-				.pathMatchers("/login", "/error", "/webjars/**")
+				.pathMatchers("/login", "/error", "/error/**", "/webjars/**")
 				.permitAll().pathMatchers("/**").authenticated().and()
 				.formLogin(login -> login.loginPage("/login")));
 		return http.build();
@@ -132,8 +135,52 @@ class Application {
 
 }
 
-@ControllerAdvice
-class LayoutAdvice {
+@Component
+class LayoutErrorAttributes implements ErrorAttributes {
+
+	private final DefaultErrorAttributes delegate = new DefaultErrorAttributes();
+	private final LayoutHelper helper;
+
+	public LayoutErrorAttributes(LayoutHelper helper) {
+		this.helper = helper;
+	}
+
+	@Override
+	public Throwable getError(ServerRequest request) {
+		return delegate.getError(request);
+	}
+
+	@Override
+	public void storeErrorInformation(Throwable error, ServerWebExchange exchange) {
+		delegate.storeErrorInformation(error, exchange);
+	}
+
+	@Override
+	public Map<String, Object> getErrorAttributes(ServerRequest request, ErrorAttributeOptions options) {
+		Map<String, Object> model = delegate.getErrorAttributes(request, options);
+		helper.enhance(request.exchange(), model);
+		return model;
+	}
+}
+
+@Component
+class LayoutInterceptor implements HandlerResultInterceptor {
+
+	private final LayoutHelper helper;
+
+	public LayoutInterceptor(LayoutHelper helper) {
+		this.helper = helper;
+	}
+
+	@Override
+	public void postHandle(ServerWebExchange request, HandlerResult result) {
+		helper.enhance(request, result.getModel().asMap());
+	}
+
+}
+
+@Component
+class LayoutHelper {
 
 	private static Pattern NAME = Pattern.compile(".*name=\\\"([a-zA-Z0-9]*)\\\".*");
 
@@ -143,13 +190,21 @@ class LayoutAdvice {
 
 	private Application application;
 
-	public LayoutAdvice(Compiler compiler, Application application) {
+	public LayoutHelper(Compiler compiler, Application application) {
 		this.compiler = compiler;
 		this.application = application;
 	}
 
-	@ModelAttribute("layout")
-	public Layout layout(Map<String, Object> model) {
+	public void enhance(ServerWebExchange exchange, Map<String, Object> model) {
+		model.put("layout", layout(model));
+		inputField(model);
+		form(model);
+		if (exchange.getAttribute(CsrfToken.class.getName()) != null) {
+			model.put("_csrf", exchange.getAttribute(CsrfToken.class.getName()));
+		}
+	}
+
+	private Layout layout(Map<String, Object> model) {
 		Layout layout = new Layout(compiler);
 		model.put("menus", menus(layout));
 		model.put("menu", menu(layout));
@@ -171,8 +226,7 @@ class LayoutAdvice {
 		};
 	}
 
-	@ModelAttribute("inputField")
-	public Mustache.Lambda inputField(Map<String, Object> model) {
+	private Mustache.Lambda inputField(Map<String, Object> model) {
 		return (frag, out) -> {
 			String body = frag.execute();
 			String label = body.substring(0, body.indexOf("<") - 1).trim();
@@ -192,13 +246,7 @@ class LayoutAdvice {
 		return matcher.matches() ? matcher.group(1) : fallback;
 	}
 
-	@ModelAttribute("_csrf")
-	Mono<CsrfToken> csrfToken(ServerWebExchange exchange) {
-		return exchange.getAttribute(CsrfToken.class.getName());
-	}
-
-	@ModelAttribute("form")
-	public Map<String, Form> form(Map<String, Object> model) {
+	private Map<String, Form> form(Map<String, Object> model) {
 		return new LinkedHashMap<String, Form>() {
 			@Override
 			public boolean containsKey(Object key) {
@@ -218,7 +266,6 @@ class LayoutAdvice {
 
 		};
 	}
-
 }
 
 class InputField {
