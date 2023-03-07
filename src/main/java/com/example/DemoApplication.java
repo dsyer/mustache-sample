@@ -2,7 +2,9 @@ package com.example;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -10,9 +12,13 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.template.TemplateAvailabilityProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.User;
@@ -20,15 +26,14 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.context.annotation.RequestScope;
 import org.springframework.web.reactive.result.view.BindStatus;
 import org.springframework.web.reactive.result.view.RequestContext;
 import org.springframework.web.reactive.result.view.View;
+import org.springframework.web.reactive.result.view.ViewResolver;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.example.Application.Menu;
@@ -161,15 +166,6 @@ class Application {
 
 }
 
-@ControllerAdvice
-class LayoutAdvice {
-	@ModelAttribute("_csrf")
-	Mono<CsrfToken> csrfToken(ServerWebExchange exchange) {
-		return exchange.getAttribute(CsrfToken.class.getName());
-	}
-}
-
-
 @JStache(path = "inputField")
 class InputField {
 
@@ -283,15 +279,28 @@ class BasePage {
 
 }
 
-@Component("error")
-@RequestScope
 class ErrorPageView implements JStachioModelView {
 
 	private ErrorPage page = new ErrorPage();
 
+	private final LayoutHelper helper;
+
+	public ErrorPageView(LayoutHelper helper) {
+		this.helper = helper;
+	}
+
 	@Override
 	public Object model() {
 		return this.page;
+	}
+
+	@Override
+	@SuppressWarnings("unchecked")
+	public Mono<Void> render(Map<String, ?> model, MediaType contentType, ServerWebExchange exchange) {
+		HashMap<String, Object> map = new HashMap<>((Map<String, Object>) model);
+		helper.enhance(page, exchange, map);
+		page.setMessage((String) model.get("error"));
+		return JStachioModelView.super.render(map, contentType, exchange);
 	}
 
 }
@@ -390,25 +399,69 @@ class LoginController {
 @Component
 class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 
-	private final Application application;
+	private final LayoutHelper helper;
 
-	public ApplicationPageConfigurer( Application application) {
-		this.application = application;
+	public ApplicationPageConfigurer(LayoutHelper helper) {
+		this.helper = helper;
 	}
 
 	@Override
 	public void configure(Object page, Map<String, Object> model, ServerWebExchange request) {
 		if (page instanceof BasePage base) {
-			base.setRequestContext(new RequestContext(request, model, request.getApplicationContext()));
-			base.setApplication(application);
-			CsrfToken token = (CsrfToken) model.get("_csrf");
-			if (token != null) {
-				base.setCsrfToken(token);
-			}
+			helper.enhance(base, request, model);
 		}
-		if (page instanceof ErrorPage) {
-			((ErrorPage) page).setMessage((String) model.get("error"));
+	}
+
+}
+
+@Component
+class LayoutHelper {
+	private final Application application;
+
+	public LayoutHelper(Application application) {
+		this.application = application;
+	}
+
+	public void enhance(BasePage base, ServerWebExchange exchange, Map<String, Object> model) {
+		if (exchange.getAttribute(CsrfToken.class.getName()) != null) {
+			@SuppressWarnings("unchecked")
+			Mono<CsrfToken> token = (Mono<CsrfToken>) exchange.getAttribute(CsrfToken.class.getName());
+			model.put("_csrf", token.doOnSuccess(value -> base.setCsrfToken(value)));
 		}
+		base.setRequestContext(new RequestContext(exchange, model, exchange.getApplicationContext()));
+		base.setApplication(application);
+	}
+
+}
+
+class DemoTemplateAvailabilityProvider implements TemplateAvailabilityProvider {
+
+	@Override
+	public boolean isTemplateAvailable(String view, Environment environment, ClassLoader classLoader,
+			ResourceLoader resourceLoader) {
+		if ("error/error".equals(view)) {
+			return true;
+		};
+		return false;
+	}
+	
+}
+
+@Component
+class ErrorPageViewResolver implements ViewResolver {
+
+	private final LayoutHelper context;
+
+	public ErrorPageViewResolver(LayoutHelper context) {
+		this.context = context;
+	}
+
+	@Override
+	public Mono<View> resolveViewName(String viewName, Locale locale) {
+		if (!"error/error".equals(viewName)) {
+			return Mono.empty();
+		}
+		return Mono.just(new ErrorPageView(context));
 	}
 
 }

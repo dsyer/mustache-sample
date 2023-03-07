@@ -28,11 +28,6 @@ public interface JStachioModelView extends View {
 			@Override
 			protected Mono<Void> renderInternal(Map<String, Object> model, MediaType contentType,
 					ServerWebExchange exchange) {
-				List<JStachioModelViewConfigurer> configurers = exchange
-						.getAttributeOrDefault(ViewSetupBeanPostProcessor.CONFIGURERS, Collections.emptyList());
-				for (JStachioModelViewConfigurer configurer : configurers) {
-					configurer.configure(model(), model, exchange);
-				}
 				return exchange.getResponse().writeWith(Mono.fromCallable(() -> {
 					try {
 						byte[] bytes = String.valueOf(JStachio.render(model())).getBytes(StandardCharsets.UTF_8);

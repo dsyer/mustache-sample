@@ -21,13 +21,13 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * A {@link BeanPostProcessor} that it registers a {@link HandlerResultHandler} that
- * automatically applies all {@link JStachioModelViewConfigurer} instances to views before
+ * A {@link BeanPostProcessor} that it registers a {@link HandlerResultHandler}
+ * that
+ * automatically applies all {@link JStachioModelViewConfigurer} instances to
+ * views before
  * rendering.
  */
 public class ViewSetupBeanPostProcessor implements BeanPostProcessor {
-
-	public static final String CONFIGURERS = JStachioModelViewConfigurer.class.getName();
 
 	private final ApplicationContext context;
 
@@ -36,10 +36,12 @@ public class ViewSetupBeanPostProcessor implements BeanPostProcessor {
 	}
 
 	/**
-	 * Look for a {@link ViewResolutionResultHandler} and replace it with a wrapper that
+	 * Look for a {@link ViewResolutionResultHandler} and replace it with a wrapper
+	 * that
 	 * configures {@link JStachioModelView} instance using the
 	 * {@link JStachioModelViewConfigurer}s in the current context.
-	 * @param bean the bean that is being created
+	 * 
+	 * @param bean     the bean that is being created
 	 * @param beanName the name of the bean
 	 * @return Object a bean wrapped with {@link ViewSetupResultHandler} if needed
 	 * @throws BeansException
@@ -76,8 +78,8 @@ public class ViewSetupBeanPostProcessor implements BeanPostProcessor {
 		@Override
 		public Mono<Void> handleResult(ServerWebExchange exchange, HandlerResult result) {
 			JStachioModelView view = findView(result.getReturnValue());
-			if (view != null) {
-				exchange.getAttributes().put(CONFIGURERS, this.configurers);
+			for (JStachioModelViewConfigurer configurer : configurers) {
+				configurer.configure(view.model(), result.getModel().asMap(), exchange);
 			}
 			return this.delegate.handleResult(exchange, result);
 		}

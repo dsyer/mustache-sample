@@ -47,6 +47,7 @@ public class DemoApplicationTests {
 				.header("cookie", this.cookie).build();
 		ResponseEntity<String> response = rest
 				.exchange(request, String.class);
+		assertThat(response.getBody()).contains("nav-tabs");
 		assertThat(response.getBody()).contains("<form");
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
