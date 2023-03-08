@@ -1,7 +1,6 @@
 package com.example.mustache;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
