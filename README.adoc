@@ -65,7 +65,7 @@ into your favourite IDE and run the main method in the
 `DemoApplication`.
 
 The app runs on http://localhost:8080, and you can authenticate with
-any username and password (even empty!). There are no real features in
+username and password `[foo, bar]`. There are no real features in
 the sample app, but it does have login and logout and a home page, to
 provide some hooks to show the templating features.
 
@@ -209,9 +209,7 @@ spring.mustache.expose-request-attributes=true
 ```
 
 With all that in place, you should find that on visiting the
-application in a browser will first redirect to "/login". Because of
-the weak (non-existent) authentication logic in your handler, you can
-put anything you like in the form and submit it to see the home page.
+application in a browser will first redirect to "/login". Put "foo" and "bar" in the form and submit it to see the home page.
 
 NOTE: in the sample app we have some stylesheets imported via webjars
 to make the app look a little bit nicer, but they don't add anything
