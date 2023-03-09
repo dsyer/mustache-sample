@@ -26,16 +26,15 @@ import org.springframework.security.web.server.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.reactive.HandlerResult;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.server.ServerWebExchange;
 
 import com.example.Application.Menu;
-import com.example.webflux.HandlerResultInterceptor;
 import com.samskivert.mustache.Mustache;
 import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Template.Fragment;
@@ -163,8 +162,8 @@ class LayoutErrorAttributes implements ErrorAttributes {
 	}
 }
 
-@Component
-class LayoutInterceptor implements HandlerResultInterceptor {
+@ControllerAdvice
+class LayoutInterceptor {
 
 	private final LayoutHelper helper;
 
@@ -172,9 +171,9 @@ class LayoutInterceptor implements HandlerResultInterceptor {
 		this.helper = helper;
 	}
 
-	@Override
-	public void postHandle(ServerWebExchange request, HandlerResult result) {
-		helper.enhance(request, result.getModel().asMap());
+	@ModelAttribute
+	public void handle(ServerWebExchange request, Map<String, Object> model) {
+		helper.enhance(request, model);
 	}
 
 }
