@@ -47,6 +47,7 @@ public class DemoApplicationTests {
 				.header("cookie", this.cookie).build();
 		ResponseEntity<String> response = rest
 				.exchange(request, String.class);
+		assertThat(response.getBody()).contains("nav-tabs");
 		assertThat(response.getBody()).contains("<form");
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
@@ -58,9 +59,9 @@ public class DemoApplicationTests {
 				.header("cookie", this.cookie).header(HttpHeaders.ACCEPT, "text/html").build();
 		ResponseEntity<String> response = rest
 				.exchange(request, String.class);
-				assertThat(response.getBody()).contains("nav-tabs");
-				assertThat(response.getBody()).contains("Not Found");
-				assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(response.getBody()).contains("nav-tabs");
+		assertThat(response.getBody()).contains("Not Found");
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 	}
 
 	private HttpHeaders cookie(HttpHeaders headers) {
@@ -87,10 +88,11 @@ public class DemoApplicationTests {
 		HttpEntity<MultiValueMap<String, String>> request = request("/login");
 		MultiValueMap<String, String> map = request.getBody();
 		map.add("username", "foo");
-		map.add("password", "");
+		map.add("password", "bar");
 		ResponseEntity<String> response = rest
 				.postForEntity("http://localhost:" + port + "/login",
 						request, String.class);
+		cookie(response.getHeaders());
 		return response;
 	}
 

@@ -46,7 +46,7 @@
 		</dependency>
 		<dependency>
 			<groupId>io.jstach</groupId>
-			<artifactId>jstachio-spring</artifactId>
+			<artifactId>jstachio-spring-webmvc</artifactId>
 			<version>${jstach.version}</version>
 		</dependency>
 		<dependency>

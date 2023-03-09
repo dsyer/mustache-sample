@@ -14,18 +14,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
-import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
-import org.springframework.security.web.authentication.logout.LogoutFilter;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
-import org.springframework.security.web.context.SecurityContextHolderFilter;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
@@ -33,7 +25,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.context.annotation.RequestScope;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.support.BindStatus;
@@ -53,7 +44,6 @@ import io.jstach.opt.spring.webmvc.JStachioModelView;
 import io.jstach.opt.spring.webmvc.JStachioModelViewConfigurer;
 import io.jstach.opt.spring.webmvc.ViewSetupHandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author Dave Syer
@@ -66,20 +56,21 @@ import jakarta.servlet.http.HttpServletResponse;
 public class DemoApplication {
 
 	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository repository)
-			throws Exception {
-		http.authorizeHttpRequests().requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and().exceptionHandling(handling -> handling
-						.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login")));
-		http.addFilterBefore(new SecurityContextHolderFilter(repository), LogoutFilter.class);
-		return http.build();
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+	  http.authorizeHttpRequests()
+		  .requestMatchers("/login", "/error", "/webjars/**")
+		  .permitAll().requestMatchers("/**").authenticated().and()
+		  .formLogin(login -> login.loginPage("/login"));
+	  return http.build();
 	}
-
+  
 	@Bean
-	public HttpSessionSecurityContextRepository sessionRepository() {
-		return new HttpSessionSecurityContextRepository();
+	public InMemoryUserDetailsManager inMemoryUserDetailsManager() {
+	  return new InMemoryUserDetailsManager(
+		  User.withUsername("foo").password("{noop}bar")
+			  .roles(new String[] { "USER" }).build());
 	}
-
+  
 	@Bean
 	public ViewSetupHandlerInterceptor viewSetupHandlerInterceptor(ApplicationContext context) {
 		return new ViewSetupHandlerInterceptor(context);
@@ -294,7 +285,7 @@ class ErrorPageView implements JStachioModelView {
 
 	@Override
 	public String getContentType() {
-		return contentType();
+		return "text/html";
 	}
 
 }
@@ -383,28 +374,9 @@ class HomeController {
 @RequestMapping("/login")
 class LoginController {
 
-	private SavedRequestAwareAuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
-
-	private final SecurityContextRepository repository;
-
-	public LoginController(SecurityContextRepository repository) {
-		this.repository = repository;
-	}
-
 	@GetMapping
 	public View form() {
 		return JStachioModelView.of(new LoginPage());
-	}
-
-	@PostMapping
-	public void authenticate(@RequestParam Map<String, String> map,
-			HttpServletRequest request, HttpServletResponse response) throws Exception {
-		Authentication result = new UsernamePasswordAuthenticationToken(
-				map.get("username"), "N/A",
-				AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
-		SecurityContextHolder.getContext().setAuthentication(result);
-		repository.saveContext(SecurityContextHolder.getContext(), request, response);
-		handler.onAuthenticationSuccess(request, response, result);
 	}
 
 }
