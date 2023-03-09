@@ -36,10 +36,7 @@ import io.jstach.jstache.JStache;
 import io.jstach.jstache.JStacheFlags;
 import io.jstach.jstache.JStacheFlags.Flag;
 import io.jstach.jstache.JStacheFormatterTypes;
-import io.jstach.jstache.JStacheLambda;
-import io.jstach.jstache.JStacheLambda.Raw;
 import io.jstach.jstache.JStachePath;
-import io.jstach.jstachio.JStachio;
 import io.jstach.opt.spring.webmvc.JStachioModelView;
 import io.jstach.opt.spring.webmvc.JStachioModelViewConfigurer;
 import io.jstach.opt.spring.webmvc.ViewSetupHandlerInterceptor;
@@ -262,12 +259,6 @@ class BasePage {
 
 	public void setRequestContext(RequestContext context) {
 		this.context = context;
-	}
-
-	@JStacheLambda
-	@Raw
-	public String render(Object field) {
-		return JStachio.render(field);
 	}
 
 }

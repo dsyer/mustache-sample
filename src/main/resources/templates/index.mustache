@@ -4,8 +4,8 @@
 		<div class="col-sm-offset-2 col-sm-10">Hello World</div>
 		{{#form}}<form method="post">
 			<div class="form-group has-feedback">
-				{{#field}}{{#render}}{{/render}}{{/field}}
-				{{#date}}{{#render}}{{/render}}{{/date}}
+				{{#field}}{{<inputField}}{{/inputField}}{{/field}}
+				{{#date}}{{<inputField}}{{/inputField}}{{/date}}
 				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
 			</div>
 			<div class="form-group">
