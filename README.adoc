@@ -33,8 +33,7 @@ dynamic content, building forms and menus, and abstracting the layout
 of the pages into separate components. The simplicity of Mustache
 shines through, and guides you to put logic in Java, keeping the
 templates as clean as possible. As a sidebar you will see how to
-secure an application with a custom login form in a slightly unusual
-but interesting way.
+secure an application with a custom login form.
 
 ## Sample Code
 
@@ -123,10 +122,10 @@ want to have a login form at "/login", so you'll need the controller:
 @RequestMapping("/login")
 class LoginController {
 
-	@GetMapping
-	public String form() {
-		return "login";
-	}
+  @GetMapping
+  public String form() {
+    return "login";
+  }
 
 }
 ```
@@ -140,76 +139,28 @@ from Spring Security:
 @SpringBootApplication
 public class DemoApplication extends WebSecurityConfigurerAdapter {
 
-  @Override
-  protected void configure(HttpSecurity http) throws Exception {
-    http.authorizeRequests()
-          .antMatchers("/login", "/error").permitAll()
-          .antMatchers("/**").authenticated()
-        .and().exceptionHandling()
-          .authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/login"));
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    http.authorizeHttpRequests()
+        .requestMatchers("/login", "/error", "/webjars/**")
+        .permitAll().requestMatchers("/**").authenticated().and()
+        .formLogin(login -> login.loginPage("/login"));
+    return http.build();
+  }
+
+  @Bean
+  public InMemoryUserDetailsManager inMemoryUserDetailsManager() {
+    return new InMemoryUserDetailsManager(
+        User.withUsername("foo").password("{noop}bar")
+            .roles(new String[] { "USER" }).build());
   }
 
 }
 ```
 
-NOTE: this is a slightly unconventional configuration for form login,
-because it isn't using the built-in `formLogin()`, which would
-automatically add the authentication entry point. If that's
-distracting then skip the next section and just add `.formLogin()` to
-your configuration instead of the `exceptionHandling()` above
-(everything after the `.and()`)
-
-### Custom Authentication Processing with Spring MVC
-
-Spring Security implements form login (and everything else really)
-using a `Filter`, so that's what you would get with the built in
-`formLogin()` configuration. Just to make things interesting, you are
-going to do the authentication in a Spring MVC handler, enabling you
-to add some custom logic, and MVC is easier to work with than
-filters.
-
-So let's extend the `LoginController` with a method to handle
-username/password authentication (it is easy to extend to more
-complicated logic). The main thing it needs to do is validate the
-input and if it is a real user, populate the `SecurityContext`:
-
-.LoginController.java
-```java
-@PostMapping
-public void authenticate(@RequestParam Map<String, String> map) throws Exception {
-  Authentication result = new UsernamePasswordAuthenticationToken(
-      map.get("username"), "N/A",
-      AuthorityUtils.commaSeparatedStringToAuthorityList("ROLE_USER"));
-  SecurityContextHolder.getContext().setAuthentication(result);
-}
-```
-
-NOTE: In this simple example there is only a "happy path" - all users are
-authenticated. Obviously this is not a very secure authentication
-process, and you would want to throw an `AuthenticationException`,
-e.g. `BadCredentialsException`, in a real controller. The exception
-would be handled by Spring Security.
-
-To mimic the behaviour of the built-in Spring Security login form, you
-also need to be able to redirect to a "saved request" that the user
-tried to access before login. Spring Security has an
-`AuthenticationSuccessHandler` abstraction for that, and a simple
-implementation that knows about the saved request. So the
-`authenticate` method can use that (it needs the servlet request and
-response, which you can add those as method parameters, and Spring MVC
-will inject them):
-
-.LoginController.java
-```java
-private AuthenticationSuccessHandler handler = new SavedRequestAwareAuthenticationSuccessHandler();
-
-@PostMapping
-public void authenticate(@RequestParam Map<String, String> map,
-    HttpServletRequest request, HttpServletResponse response) throws Exception {
-  // ... authenticate user from request parameters
-  handler.onAuthenticationSuccess(request, response, result);
-}
-```
+NOTE: the `{noop}` prefix in the password is deprecated (but will never be 
+removed). It will show up as a warning in the source code, to prompt you to
+replace it with something more real for production use.
 
 ### The Login Form
 
@@ -494,17 +445,17 @@ be injected into the controller advice using `@Autowired`:
 ```java
 @ControllerAdvice
 class LayoutAdvice {
-	private final Mustache.Compiler compiler;
+  private final Mustache.Compiler compiler;
 
-	@Autowired
-	public LayoutAdvice(Compiler compiler) {
-		this.compiler = compiler;
-	}
+  @Autowired
+  public LayoutAdvice(Compiler compiler) {
+    this.compiler = compiler;
+  }
 
-	@ModelAttribute("layout")
-	public Mustache.Lambda layout(Map<String, Object> model) {
-		return new Layout(compiler);
-	}
+  @ModelAttribute("layout")
+  public Mustache.Lambda layout(Map<String, Object> model) {
+    return new Layout(compiler);
+  }
 }
 ```
 
