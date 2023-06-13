@@ -54,20 +54,20 @@ public class DemoApplication {
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-	  http.authorizeHttpRequests()
-		  .requestMatchers("/login", "/error", "/webjars/**")
-		  .permitAll().requestMatchers("/**").authenticated().and()
-		  .formLogin(login -> login.loginPage("/login"));
-	  return http.build();
+		http.authorizeHttpRequests(requests -> {
+			requests.requestMatchers("/login", "/error", "/webjars/**").permitAll();
+			requests.requestMatchers("/**").authenticated();
+		}).formLogin(login -> login.loginPage("/login"));
+		return http.build();
 	}
-  
+
 	@Bean
 	public InMemoryUserDetailsManager inMemoryUserDetailsManager() {
-	  return new InMemoryUserDetailsManager(
-		  User.withUsername("foo").password("{noop}bar")
-			  .roles(new String[] { "USER" }).build());
+		return new InMemoryUserDetailsManager(
+				User.withUsername("foo").password("{noop}bar")
+						.roles(new String[] { "USER" }).build());
 	}
-  
+
 	@Bean
 	public ViewSetupHandlerInterceptor viewSetupHandlerInterceptor(ApplicationContext context) {
 		return new ViewSetupHandlerInterceptor(context);
