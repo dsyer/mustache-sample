@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -39,7 +38,6 @@ import io.jstach.jstache.JStacheFormatterTypes;
 import io.jstach.jstache.JStachePath;
 import io.jstach.opt.spring.webmvc.JStachioModelView;
 import io.jstach.opt.spring.webmvc.JStachioModelViewConfigurer;
-import io.jstach.opt.spring.webmvc.ViewSetupHandlerInterceptor;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
@@ -66,11 +64,6 @@ public class DemoApplication {
 		return new InMemoryUserDetailsManager(
 				User.withUsername("foo").password("{noop}bar")
 						.roles(new String[] { "USER" }).build());
-	}
-
-	@Bean
-	public ViewSetupHandlerInterceptor viewSetupHandlerInterceptor(ApplicationContext context) {
-		return new ViewSetupHandlerInterceptor(context);
 	}
 
 	public static void main(String[] args) {
