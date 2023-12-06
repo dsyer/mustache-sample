@@ -1,15 +1,11 @@
 package com.example;
 
-import java.io.IOException;
-import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -21,17 +17,22 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Controller;
-import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.support.BindStatus;
+import org.springframework.web.servlet.support.RequestContext;
 
 import com.example.Application.Menu;
-import com.samskivert.mustache.Mustache;
-import com.samskivert.mustache.Mustache.Compiler;
-import com.samskivert.mustache.Template.Fragment;
+
+import jakarta.annotation.Nullable;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * @author Dave Syer
@@ -42,9 +43,9 @@ public class DemoApplication {
 
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http.authorizeHttpRequests()
+		http.authorizeHttpRequests(security -> security
 				.requestMatchers("/login", "/error", "/webjars/**")
-				.permitAll().requestMatchers("/**").authenticated().and()
+				.permitAll().requestMatchers("/**").authenticated())
 				.formLogin(login -> login.loginPage("/login"));
 		return http.build();
 	}
@@ -127,85 +128,46 @@ class Application {
 
 }
 
-@ControllerAdvice
-class LayoutAdvice {
-
-	private static Pattern NAME = Pattern.compile(".*name=\\\"([a-zA-Z0-9]*)\\\".*");
-
-	private static Pattern TYPE = Pattern.compile(".*type=\\\"([a-zA-Z0-9]*)\\\".*");
-
-	private final Mustache.Compiler compiler;
+@Component
+class LayoutAdvice implements HandlerInterceptor, WebMvcConfigurer {
 
 	private Application application;
 
-	public LayoutAdvice(Compiler compiler, Application application) {
-		this.compiler = compiler;
+	public LayoutAdvice(Application application) {
 		this.application = application;
 	}
 
-	@ModelAttribute("menus")
-	public Iterable<Menu> menus(@ModelAttribute Layout layout) {
+	@Override
+	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+			@Nullable ModelAndView modelAndView) throws Exception {
 		for (Menu menu : application.getMenus()) {
 			menu.setActive(false);
 		}
-		return application.getMenus();
-	}
-
-	@ModelAttribute("menu")
-	public Mustache.Lambda menu(@ModelAttribute Layout layout) {
-		return (frag, out) -> {
-			Menu menu = application.getMenu(frag.execute());
-			menu.setActive(true);
-			layout.title = menu.getTitle();
-		};
-	}
-
-	@ModelAttribute("inputField")
-	public Mustache.Lambda inputField(Map<String, Object> model) {
-		return (frag, out) -> {
-			String body = frag.execute();
-			String label = body.substring(0, body.indexOf("<") - 1).trim();
-			Form form = (Form) frag.context();
-			String target = form.getName();
-			String name = match(NAME, body, "unknown");
-			String type = match(TYPE, body, "text");
-			BindingResult status = (BindingResult) model
-					.get("org.springframework.validation.BindingResult." + target);
-			InputField field = new InputField(label, name, type, status);
-			compiler.compile("{{>inputField}}").execute(field, out);
-		};
-	}
-
-	private String match(Pattern pattern, String body, String fallback) {
-		Matcher matcher = pattern.matcher(body);
-		return matcher.matches() ? matcher.group(1) : fallback;
-	}
-
-	@ModelAttribute("form")
-	public Map<String, Form> form(Map<String, Object> model) {
-		return new LinkedHashMap<String, Form>() {
-			@Override
-			public boolean containsKey(Object key) {
-				if (!super.containsKey(key)) {
-					put((String) key, new Form((String) key, model.get(key)));
-				}
-				return super.containsKey(key);
+		if (modelAndView != null) {
+			Map<String, Object> map = modelAndView.getModel();
+			map.put("menus", application.getMenus());
+			if (map.containsKey("foo")) {
+				application.getMenu("home").setActive(true);
 			}
-
-			@Override
-			public Form get(Object key) {
-				if (!super.containsKey(key)) {
-					put((String) key, new Form((String) key, model.get(key)));
-				}
-				return super.get(key);
+			else {
+				application.getMenu("login").setActive(true);
 			}
-
-		};
+			RequestContext context = new RequestContext(request, map);
+			for (String key : new HashSet<>(map.keySet())) {
+				if (key.startsWith("org.springframework.validation.BindingResult.")) {
+					String name = key.substring(key.lastIndexOf(".") + 1);
+					modelAndView.addObject("errors", context.getBindStatus(name + ".*").getErrorMessages());
+				}
+				if (map.get(key) instanceof Form field) {
+					field.setContext(context);
+				}
+			}
+		}
 	}
 
-	@ModelAttribute("layout")
-	public Mustache.Lambda layout(Map<String, Object> model) {
-		return new Layout(compiler);
+	@Override
+	public void addInterceptors(InterceptorRegistry registry) {
+		registry.addInterceptor(this);
 	}
 
 }
@@ -224,63 +186,41 @@ class InputField {
 
 	List<String> errors = Collections.emptyList();
 
-	public InputField(String label, String name, String type, BindingResult status) {
+	public InputField(String label, String name, String type) {
 		this.label = label;
 		this.name = name;
-		if (status != null) {
-			valid = !status.hasFieldErrors(name);
-			errors = status.getFieldErrors(name).stream()
-					.map(error -> error.getDefaultMessage()).collect(Collectors.toList());
-			value = status.getFieldValue(name) == null ? ""
-					: status.getFieldValue(name).toString();
-		}
 		this.date = "date".equals(type);
 	}
 
+	public void setStatus(BindStatus status) {
+		if (status != null) {
+			valid = !status.isError();
+			errors = Arrays.asList(status.getErrorMessages());
+			value = status.getValue() == null ? "" : status.getValue().toString();
+		}
+	}
+
 }
 
-class Form implements Mustache.Lambda {
+class Form {
 
-	private Object target;
+	private final InputField target = new InputField("Value", "value", "text");
+	private final Foo foo;
 
-	private String name;
-
-	public Form(String name, Object target) {
-		this.name = name;
-		this.target = target;
+	public Form(Foo foo) {
+		this.foo = foo;
 	}
 
-	@Override
-	public void execute(Fragment frag, Writer out) throws IOException {
-		frag.execute(this, out);
+	public Foo getFoo() {
+		return foo;
 	}
 
-	public Object getTarget() {
+	public InputField getValue() {
 		return target;
 	}
 
-	public String getName() {
-		return name;
-	}
-
-}
-
-class Layout implements Mustache.Lambda {
-
-	String title = "Demo Application";
-
-	String body;
-
-	private Compiler compiler;
-
-	public Layout(Compiler compiler) {
-		this.compiler = compiler;
-	}
-
-	@Override
-	public void execute(Fragment frag, Writer out) throws IOException {
-		body = frag.execute();
-		compiler.compile("{{>layout}}").execute(frag.context(), out);
+	public void setContext(RequestContext context) {
+		this.target.setStatus(context.getBindStatus("foo.value"));
 	}
 
 }
@@ -315,14 +255,18 @@ class Foo {
 @RequestMapping("/")
 class HomeController {
 
+	@ModelAttribute
+	public Form form(@ModelAttribute Foo foo) {
+		return new Form(foo);
+	}
+
 	@GetMapping
-	public String home(@ModelAttribute Foo foo) {
+	public String home() {
 		return "index";
 	}
 
 	@PostMapping
-	public String post(@ModelAttribute Foo foo, Map<String, Object> model) {
-		model.put("value", foo.getValue());
+	public String post() {
 		return "index";
 	}
 

@@ -12,7 +12,8 @@
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" ></script>
 </head>
 <body>}}
-{{#layout}}{{#menu}}login{{/menu}}
+{{<layout}}{{$title}}Login{{/title}}
+	{{$body}}
 	<h1>Login</h1>
 	<div class="container">
 		<form action="/login" method="post">
@@ -26,5 +27,6 @@
 			<button type="submit" class="btn btn-primary">Submit</button>
 		</form>
 	</div>
+	{{/body}}
 {{/layout}}
 {{!</body></html>}}

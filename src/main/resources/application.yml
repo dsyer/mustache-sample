@@ -9,6 +9,6 @@ spring:
   mustache:
     servlet:
       expose-request-attributes: true
-logging:
-  level:
-    org.springframework.security: DEBUG
+# logging:
+#   level:
+#     org.springframework.security: DEBUG
