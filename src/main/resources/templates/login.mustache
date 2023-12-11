@@ -22,9 +22,14 @@
 					class="form-control" id="username" name="username" /> <label
 					for="username">Password:</label> <input type="password"
 					class="form-control" id="password" name="password" />
+					<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
 			</div>
-			<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
-			<button type="submit" class="btn btn-primary">Submit</button>
+			<br/>
+			<div class="form-group">
+				<div class="col-sm-offset-2 col-sm-10">
+					<button class="btn btn-primary" type="submit">Submit</button>
+				</div>
+			</div>
 		</form>
 	</div>
 	{{/body}}
