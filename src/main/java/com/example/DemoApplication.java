@@ -1,5 +1,7 @@
 package com.example;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +31,8 @@ import org.springframework.web.servlet.support.BindStatus;
 import org.springframework.web.servlet.support.RequestContext;
 
 import com.example.Application.Menu;
+import com.samskivert.mustache.Mustache;
+import com.samskivert.mustache.Template;
 
 import jakarta.annotation.Nullable;
 import jakarta.servlet.http.HttpServletRequest;
@@ -146,12 +150,15 @@ class LayoutAdvice implements HandlerInterceptor, WebMvcConfigurer {
 		if (modelAndView != null) {
 			Map<String, Object> map = modelAndView.getModel();
 			map.put("menus", application.getMenus());
-			if (map.containsKey("foo")) {
-				application.getMenu("home").setActive(true);
-			}
-			else {
-				application.getMenu("login").setActive(true);
-			}
+			map.put("menu", new Mustache.Lambda() {
+				@Override
+				public void execute(Template.Fragment frag, Writer out) throws IOException {
+					String name = frag.execute();
+					Menu menu = application.getMenu(name);
+					menu.setActive(true);
+					out.write(menu.getTitle());
+				}
+			});
 			RequestContext context = new RequestContext(request, map);
 			for (String key : new HashSet<>(map.keySet())) {
 				if (key.startsWith("org.springframework.validation.BindingResult.")) {
