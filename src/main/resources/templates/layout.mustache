@@ -17,7 +17,7 @@
 <body>
 	<ul class="nav nav-tabs">
 		{{#menus}}<li class="nav-item"><a class="nav-link{{#active}} active{{/active}}" href="{{path}}">{{name}}</a></li>{{/menus}}
-		<li class="nav-item"><a class="nav-link" href="#" onclick="$('#logout').trigger('submit'); return false">Logout</a></li>
+		<li class="nav-item"><button class="nav-link" onclick="$('#logout').trigger('submit')">Logout</button></li>
 	</ul>
 	<div class="container-fluid">
 		<div class="container xd-container">
