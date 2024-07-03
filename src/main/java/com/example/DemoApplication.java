@@ -366,12 +366,12 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 
 	@Override
 	public void configure(Object page, Map<String, Object> model, HttpServletRequest request) {
+		CsrfToken token = (CsrfToken) request.getAttribute("_csrf");
+		if (token != null) {
+			model.put("csrf", token.getToken());
+		}
 		if (page instanceof BasePage) {
 			BasePage base = (BasePage) page;
-			CsrfToken token = (CsrfToken) request.getAttribute("_csrf");
-			if (token != null) {
-				model.put("csrf", token.getToken());
-			}
 			base.setRequestContext(new RequestContext(request, model));
 			base.setApplication(application);
 		}
