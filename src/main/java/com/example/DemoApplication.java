@@ -2,7 +2,6 @@ package com.example;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -179,7 +178,7 @@ class InputField {
 
 }
 
-record Form(String name, Object target, CsrfToken _csrf) {
+record Form(String name, Object target) {
 }
 
 @JStache(path = "index")
@@ -197,7 +196,7 @@ class IndexPage extends BasePage {
 	}
 
 	public Form form() {
-		return new Form("foo", foo, _csrf());
+		return new Form("foo", foo);
 	}
 
 	public InputField field() {
@@ -212,17 +211,12 @@ class IndexPage extends BasePage {
 
 class BasePage {
 	private Application application;
-	private CsrfToken _csrf;
 	private String active = "home";
 	private RequestContext context;
 
 	@Autowired
 	public void setApplication(Application application) {
 		this.application = application;
-	}
-
-	public void setCsrfToken(CsrfToken _csrf) {
-		this._csrf = _csrf;
 	}
 
 	public void activate(String name) {
@@ -236,10 +230,6 @@ class BasePage {
 			menu.setActive(true);
 		}
 		return application.getMenus();
-	}
-
-	public CsrfToken _csrf() {
-		return this._csrf;
 	}
 
 	public BindStatus status(String name) {
@@ -375,12 +365,14 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 	}
 
 	@Override
-	public void configure(Object page, Map<String, ?> model, HttpServletRequest request) {
+	public void configure(Object page, Map<String, Object> model, HttpServletRequest request) {
 		if (page instanceof BasePage) {
 			BasePage base = (BasePage) page;
-			base.setCsrfToken((CsrfToken) request.getAttribute("_csrf"));
-			Map<String, Object> map = new HashMap<>(model);
-			base.setRequestContext(new RequestContext(request, map));
+			CsrfToken token = (CsrfToken) request.getAttribute("_csrf");
+			if (token != null) {
+				model.put("csrf", token.getToken());
+			}
+			base.setRequestContext(new RequestContext(request, model));
 			base.setApplication(application);
 		}
 		if (page instanceof ErrorPage) {

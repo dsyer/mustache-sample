@@ -23,7 +23,7 @@
 					for="username">Password:</label> <input type="password"
 					class="form-control" id="password" name="password" />
 			</div>
-			<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+			<input type="hidden" name="_csrf" value="{{@context.csrf}}" />
 			<button type="submit" class="btn btn-primary">Submit</button>
 		</form>
 	</div>

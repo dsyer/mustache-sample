@@ -25,7 +25,7 @@
 		</div>
 	</div>
 	<form id="logout" action="/logout" method="post">
-		<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+		<input type="hidden" name="_csrf" value="{{@context.csrf}}" />
 	</form>
 </body>
 </html>

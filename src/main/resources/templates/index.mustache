@@ -6,7 +6,7 @@
 			<div class="form-group has-feedback">
 				{{#field}}{{<inputField}}{{/inputField}}{{/field}}
 				{{#date}}{{<inputField}}{{/inputField}}{{/date}}
-				<input type="hidden" name="_csrf" value="{{_csrf.token}}" />
+				<input type="hidden" name="_csrf" value="{{@context.csrf}}" />
 			</div>
 			<div class="form-group">
 				<div class="col-sm-offset-2 col-sm-10">
