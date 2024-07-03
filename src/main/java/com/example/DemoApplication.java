@@ -370,13 +370,12 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 		if (token != null) {
 			model.put("csrf", token.getToken());
 		}
-		if (page instanceof BasePage) {
-			BasePage base = (BasePage) page;
+		if (page instanceof BasePage base) {
 			base.setRequestContext(new RequestContext(request, model));
 			base.setApplication(application);
 		}
-		if (page instanceof ErrorPage) {
-			((ErrorPage) page).setMessage((String) model.get("error"));
+		if (page instanceof ErrorPage error) {
+			error.setMessage((String) model.get("error"));
 		}
 	}
 
