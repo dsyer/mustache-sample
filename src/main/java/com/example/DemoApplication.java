@@ -52,7 +52,7 @@ public class DemoApplication {
 	@Bean
 	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http.authorizeHttpRequests(requests -> {
-			requests.requestMatchers("/login", "/error", "/webjars/**").permitAll();
+			requests.requestMatchers("/login", "/error", "/webjars/**", "/favicon.ico").permitAll();
 			requests.requestMatchers("/**").authenticated();
 		}).formLogin(login -> login.loginPage("/login"));
 		return http.build();
@@ -265,21 +265,7 @@ class ErrorPageView implements JStachioModelView {
 }
 
 @JStache(path = "error")
-class ErrorPage extends BasePage {
-	private String message = "Oops!";
-
-	public ErrorPage() {
-		activate("home");
-	}
-
-	public String getMessage() {
-		return message;
-	}
-
-	public void setMessage(String message) {
-		this.message = message;
-	}
-}
+class ErrorPage extends BasePage {}
 
 @JStache(path = "login")
 class LoginPage extends BasePage {
@@ -373,9 +359,6 @@ class ApplicationPageConfigurer implements JStachioModelViewConfigurer {
 		if (page instanceof BasePage base) {
 			base.setRequestContext(new RequestContext(request, model));
 			base.setApplication(application);
-		}
-		if (page instanceof ErrorPage error) {
-			error.setMessage((String) model.get("error"));
 		}
 	}
 
